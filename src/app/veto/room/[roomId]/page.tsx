@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/badge';
@@ -43,6 +43,7 @@ export default function RoomPage() {
     const [error, setError] = useState<string | null>(null);
     const [teamName, setTeamName] = useState('');
     const [isEditingName, setIsEditingName] = useState(false);
+    const lastUpdateTimestamp = useRef<number>(0);
 
     // Try to get room by master room ID first
     const masterRoomQuery = api.room.getByMasterRoomId.useQuery(
@@ -56,8 +57,31 @@ export default function RoomPage() {
         { enabled: !!roomId && !masterRoomQuery.data && !masterRoomQuery.isPending }
     );
 
-    const updateTeamReadyMutation = api.room.updateTeamReady.useMutation();
-    const updateTeamNameMutation = api.room.updateTeamName.useMutation();
+    // Real-time updates for the room
+    const roomUpdatesQuery = api.room.getRoomUpdates.useQuery(
+        { roomId },
+        {
+            enabled: !!roomData, // Only poll after we have initial room data
+            refetchInterval: 1000,
+            refetchIntervalInBackground: true,
+        }
+    );
+
+    const updateTeamReadyMutation = api.room.updateTeamReady.useMutation({
+        onSuccess: (updatedRoom) => {
+            setRoomData(updatedRoom);
+            // Refetch room updates to get latest state
+            void roomUpdatesQuery.refetch();
+        },
+    });
+
+    const updateTeamNameMutation = api.room.updateTeamName.useMutation({
+        onSuccess: (updatedRoom) => {
+            setRoomData(updatedRoom);
+            setIsEditingName(false);
+            void roomUpdatesQuery.refetch();
+        },
+    });
 
     useEffect(() => {
         if (masterRoomQuery.data) {
@@ -75,6 +99,35 @@ export default function RoomPage() {
             setIsLoading(false);
         }
     }, [masterRoomQuery.data, teamRoomQuery.data, masterRoomQuery.isError, teamRoomQuery.isError]);
+
+    // Update room data from real-time updates
+    useEffect(() => {
+        if (!roomUpdatesQuery.data) return;
+
+        const updateData = roomUpdatesQuery.data;
+        // Only update if we have a newer timestamp
+        const newTimestamp = updateData.timestamp || Date.now();
+        if (newTimestamp <= lastUpdateTimestamp.current) return;
+
+        lastUpdateTimestamp.current = newTimestamp;
+
+        setRoomData(prevData => {
+            if (!prevData) return prevData;
+
+            return {
+                ...prevData,
+                teamAReady: updateData.teamAReady,
+                teamBReady: updateData.teamBReady,
+                teamAName: updateData.teamAName,
+                teamBName: updateData.teamBName,
+                status: updateData.status,
+                vetoStarted: updateData.vetoStarted,
+                vetoCompleted: updateData.vetoCompleted,
+                currentTurn: updateData.currentTurn,
+                vetoState: updateData.vetoState,
+            };
+        });
+    }, [roomUpdatesQuery.data]);
 
     const handleTeamReady = async (ready: boolean) => {
         if (!roomData?.teamRole) return;

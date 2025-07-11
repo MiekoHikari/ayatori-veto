@@ -69,16 +69,20 @@ export default function VetoProcess({
         { refetchInterval: 2000 }
     );
 
-    // Mutations
-    const startVetoMutation = api.room.startVeto.useMutation({
-        onSuccess: () => {
-            void vetoStateQuery.refetch();
-        },
-    });
+    // Also poll room updates for better real-time experience
+    const roomUpdatesQuery = api.room.getRoomUpdates.useQuery(
+        { roomId },
+        {
+            refetchInterval: 1000,
+            refetchIntervalInBackground: true,
+        }
+    );
 
+    // Mutations
     const makeVetoActionMutation = api.room.makeVetoAction.useMutation({
         onSuccess: (result) => {
             void vetoStateQuery.refetch();
+            void roomUpdatesQuery.refetch();
             setShowSideSelection(false);
             setPendingMapId(null);
 
@@ -94,19 +98,14 @@ export default function VetoProcess({
     });
 
     const vetoData = vetoStateQuery.data;
+    const roomData = roomUpdatesQuery.data;
     const vetoState = vetoData?.vetoState as VetoState | null;
     const currentSequenceItem = vetoState?.vetoSequence[vetoState.currentStep];
     const isMyTurn = !isSpectator && teamRole === vetoData?.currentTurn;
 
-    const handleStartVeto = async () => {
-        if (!teamRole) return;
-
-        try {
-            await startVetoMutation.mutateAsync({ teamId: roomId });
-        } catch (error) {
-            console.error('Failed to start veto:', error);
-        }
-    };
+    // Use room data if available, fallback to veto data
+    const vetoStarted = roomData?.vetoStarted ?? vetoData?.vetoStarted ?? false;
+    const vetoCompleted = roomData?.vetoCompleted ?? vetoData?.vetoCompleted ?? false;
 
     const handleMapAction = async (mapId: string, action: 'ban' | 'pick') => {
         if (!teamRole || !isMyTurn) return;
@@ -162,39 +161,28 @@ export default function VetoProcess({
         );
     }
 
-    if (!vetoData?.vetoStarted) {
+    if (!vetoStarted) {
         return (
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Swords className="w-5 h-5" />
-                        Ready to Start Veto Process
+                        Waiting for Veto Process
                     </CardTitle>
                     <CardDescription>
-                        Both teams are ready. The veto process can now begin.
+                        The veto process will automatically start when both teams are ready.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {!isSpectator && (
-                        <Button
-                            onClick={handleStartVeto}
-                            disabled={startVetoMutation.isPending}
-                            className="w-full"
-                        >
-                            {startVetoMutation.isPending ? 'Starting Veto...' : 'Start Veto Process'}
-                        </Button>
-                    )}
-                    {isSpectator && (
-                        <p className="text-center text-muted-foreground">
-                            Waiting for teams to start the veto process...
-                        </p>
-                    )}
+                    <p className="text-center text-muted-foreground">
+                        Veto will begin automatically once both teams are ready...
+                    </p>
                 </CardContent>
             </Card>
         );
     }
 
-    if (vetoData.vetoCompleted) {
+    if (vetoCompleted) {
         return (
             <Card>
                 <CardHeader>
@@ -344,10 +332,10 @@ export default function VetoProcess({
                                     key={mapId}
                                     variant={isMyTurn ? "outline" : "ghost"}
                                     className={`h-auto p-4 ${isMyTurn && currentSequenceItem
-                                            ? currentSequenceItem.action === 'ban'
-                                                ? 'hover:border-red-500 hover:text-red-500'
-                                                : 'hover:border-green-500 hover:text-green-500'
-                                            : ''
+                                        ? currentSequenceItem.action === 'ban'
+                                            ? 'hover:border-red-500 hover:text-red-500'
+                                            : 'hover:border-green-500 hover:text-green-500'
+                                        : ''
                                         }`}
                                     onClick={() => currentSequenceItem && handleMapAction(mapId, currentSequenceItem.action)}
                                     disabled={!isMyTurn || makeVetoActionMutation.isPending || showSideSelection}

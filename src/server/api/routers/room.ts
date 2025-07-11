@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { EventEmitter } from "events";
+import { observable } from "@trpc/server/observable";
+
+// Global event emitter for room updates
+const roomEventEmitter = new EventEmitter();
 
 const createRoomSchema = z.object({
     masterRoomId: z.string(),
@@ -23,6 +28,7 @@ const VetoActionSchema = z.object({
 });
 
 // Veto state structure
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const VetoStateSchema = z.object({
     actions: z.array(VetoActionSchema),
     availableMaps: z.array(z.string()),
@@ -178,13 +184,18 @@ export const roomRouter = createTRPCRouter({
                         { teamBId: input.teamId },
                     ],
                 },
-            });
+            }) as RoomWithVeto | null;
 
             if (!room) {
                 throw new Error("Room not found");
             }
 
             const isTeamA = room.teamAId === input.teamId;
+
+            // Prevent unready if veto has started
+            if (!input.ready && room.vetoStarted) {
+                throw new Error("Cannot mark as unready after veto process has started");
+            }
 
             // If team is trying to mark ready, ensure they have set a team name
             if (input.ready) {
@@ -201,6 +212,109 @@ export const roomRouter = createTRPCRouter({
             const updatedRoom = await ctx.db.room.update({
                 where: { id: room.id },
                 data: updateData,
+            }) as RoomWithVeto;
+
+            // Check if both teams are now ready and auto-start veto
+            const shouldAutoStartVeto = updatedRoom.teamAReady &&
+                updatedRoom.teamBReady &&
+                !updatedRoom.vetoStarted;
+
+            let vetoState: VetoState | null = null;
+            let currentTurn: string | null = null;
+
+            if (shouldAutoStartVeto) {
+                // Generate veto sequence
+                const generateVetoSequence = (roundType: string, mapCount: number) => {
+                    const sequence: Array<{ team: 'team-a' | 'team-b', action: 'ban' | 'pick', completed: boolean }> = [];
+
+                    if (roundType === 'bo1') {
+                        const bansNeeded = mapCount - 1;
+                        for (let i = 0; i < bansNeeded; i++) {
+                            sequence.push({
+                                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                action: 'ban',
+                                completed: false,
+                            });
+                        }
+                    } else if (roundType === 'bo3') {
+                        const bansNeeded = Math.max(0, mapCount - 3);
+                        const picksNeeded = 3;
+
+                        for (let i = 0; i < bansNeeded; i++) {
+                            sequence.push({
+                                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                action: 'ban',
+                                completed: false,
+                            });
+                        }
+
+                        for (let i = 0; i < picksNeeded; i++) {
+                            sequence.push({
+                                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                action: 'pick',
+                                completed: false,
+                            });
+                        }
+                    } else if (roundType === 'bo5') {
+                        const bansNeeded = Math.max(0, mapCount - 5);
+                        const picksNeeded = 5;
+
+                        for (let i = 0; i < bansNeeded; i++) {
+                            sequence.push({
+                                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                action: 'ban',
+                                completed: false,
+                            });
+                        }
+
+                        for (let i = 0; i < picksNeeded; i++) {
+                            sequence.push({
+                                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                action: 'pick',
+                                completed: false,
+                            });
+                        }
+                    }
+
+                    return sequence;
+                };
+
+                const vetoSequence = generateVetoSequence(updatedRoom.roundType, updatedRoom.maps.length);
+                const initialVetoState: VetoState = {
+                    actions: [],
+                    availableMaps: [...updatedRoom.maps],
+                    pickedMaps: [],
+                    bannedMaps: [],
+                    vetoSequence,
+                    currentStep: 0,
+                };
+
+                currentTurn = vetoSequence[0]?.team ?? 'team-a';
+                vetoState = initialVetoState;
+
+                // Update room with veto started
+                await ctx.db.room.update({
+                    where: { id: room.id },
+                    data: {
+                        vetoStarted: true,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+                        vetoState: initialVetoState as any,
+                        currentTurn,
+                        status: 'active',
+                    },
+                });
+
+                // Emit room update event
+                roomEventEmitter.emit(`room:${updatedRoom.masterRoomId}:update`, {
+                    type: 'veto-started',
+                    room: updatedRoom.masterRoomId,
+                });
+            }
+
+            // Emit room update event
+            roomEventEmitter.emit(`room:${updatedRoom.masterRoomId}:update`, {
+                type: 'team-ready-updated',
+                room: updatedRoom.masterRoomId,
             });
 
             return {
@@ -218,9 +332,13 @@ export const roomRouter = createTRPCRouter({
                 teamBReady: updatedRoom.teamBReady,
                 teamAName: updatedRoom.teamAName,
                 teamBName: updatedRoom.teamBName,
-                status: updatedRoom.status as "waiting" | "active" | "completed" | "expired",
+                status: shouldAutoStartVeto ? 'active' : updatedRoom.status as "waiting" | "active" | "completed" | "expired",
                 masterRoomId: updatedRoom.masterRoomId,
                 teamRole: isTeamA ? ("team-a" as const) : ("team-b" as const),
+                vetoStarted: shouldAutoStartVeto || updatedRoom.vetoStarted,
+                vetoCompleted: updatedRoom.vetoCompleted ?? false,
+                currentTurn,
+                vetoState,
             };
         }),
 
@@ -321,123 +439,78 @@ export const roomRouter = createTRPCRouter({
             };
         }),
 
-    startVeto: publicProcedure
+    // Real-time subscription for room updates
+    onRoomUpdate: publicProcedure
         .input(z.object({
-            teamId: z.string(),
+            roomId: z.string(),
         }))
-        .mutation(async ({ ctx, input }) => {
+        .subscription(({ input }) => {
+            return observable<{
+                type: string;
+                room: string;
+                data?: unknown;
+            }>((emit) => {
+                const onUpdate = (data: { type: string; room: string;[key: string]: unknown }) => {
+                    if (data.room === input.roomId) {
+                        emit.next(data);
+                    }
+                };
+
+                roomEventEmitter.on(`room:${input.roomId}:update`, onUpdate);
+
+                return () => {
+                    roomEventEmitter.off(`room:${input.roomId}:update`, onUpdate);
+                };
+            });
+        }),
+
+    // Real-time room updates using polling (fallback for when subscriptions aren't available)
+    getRoomUpdates: publicProcedure
+        .input(z.object({
+            roomId: z.string(),
+            lastUpdate: z.number().optional(),
+        }))
+        .query(async ({ ctx, input }) => {
             const room = await ctx.db.room.findFirst({
                 where: {
                     OR: [
-                        { teamAId: input.teamId },
-                        { teamBId: input.teamId },
+                        { masterRoomId: input.roomId },
+                        { teamAId: input.roomId },
+                        { teamBId: input.roomId },
                     ],
                 },
             }) as RoomWithVeto | null;
 
             if (!room) {
-                throw new Error("Room not found");
+                return null;
             }
 
-            // Check if both teams are ready
-            if (!room.teamAReady || !room.teamBReady) {
-                throw new Error("Both teams must be ready before starting veto");
-            }
-
-            // Check if veto already started
-            if (room.vetoStarted) {
-                throw new Error("Veto process has already started");
-            }
-
-            // Generate veto sequence based on round type
-            const generateVetoSequence = (roundType: string, mapCount: number) => {
-                const sequence: Array<{ team: 'team-a' | 'team-b', action: 'ban' | 'pick', completed: boolean }> = [];
-
-                if (roundType === 'bo1') {
-                    // BO1: Ban until 1 map remains, then pick sides
-                    const bansNeeded = mapCount - 1;
-                    for (let i = 0; i < bansNeeded; i++) {
-                        sequence.push({
-                            team: i % 2 === 0 ? 'team-a' : 'team-b',
-                            action: 'ban',
-                            completed: false,
-                        });
-                    }
-                    // The remaining map is automatically picked, no explicit pick action needed
-                } else if (roundType === 'bo3') {
-                    // BO3: Ban until 3 maps remain, then pick them
-                    const bansNeeded = Math.max(0, mapCount - 3);
-                    const picksNeeded = 3;
-
-                    // Alternating bans
-                    for (let i = 0; i < bansNeeded; i++) {
-                        sequence.push({
-                            team: i % 2 === 0 ? 'team-a' : 'team-b',
-                            action: 'ban',
-                            completed: false,
-                        });
-                    }
-
-                    // Alternating picks for the remaining maps
-                    for (let i = 0; i < picksNeeded; i++) {
-                        sequence.push({
-                            team: i % 2 === 0 ? 'team-a' : 'team-b',
-                            action: 'pick',
-                            completed: false,
-                        });
-                    }
-                } else if (roundType === 'bo5') {
-                    // BO5: Ban until 5 maps remain, then pick them
-                    const bansNeeded = Math.max(0, mapCount - 5);
-                    const picksNeeded = 5;
-
-                    // Alternating bans
-                    for (let i = 0; i < bansNeeded; i++) {
-                        sequence.push({
-                            team: i % 2 === 0 ? 'team-a' : 'team-b',
-                            action: 'ban',
-                            completed: false,
-                        });
-                    }
-
-                    // Alternating picks for the remaining maps
-                    for (let i = 0; i < picksNeeded; i++) {
-                        sequence.push({
-                            team: i % 2 === 0 ? 'team-a' : 'team-b',
-                            action: 'pick',
-                            completed: false,
-                        });
-                    }
-                }
-
-                return sequence;
-            };
-
-            const vetoSequence = generateVetoSequence(room.roundType, room.maps.length);
-            const initialVetoState: VetoState = {
-                actions: [],
-                availableMaps: [...room.maps],
-                pickedMaps: [],
-                bannedMaps: [],
-                vetoSequence,
-                currentStep: 0,
-            };
-
-            await ctx.db.room.update({
-                where: { id: room.id },
-                data: {
-                    vetoStarted: true,
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-                    vetoState: initialVetoState as any,
-                    currentTurn: vetoSequence[0]?.team ?? 'team-a',
-                    status: 'active',
-                },
-            });
+            const teamRole = room.teamAId === input.roomId ? 'team-a' :
+                room.teamBId === input.roomId ? 'team-b' : undefined;
 
             return {
-                success: true,
-                vetoState: initialVetoState,
-                currentTurn: vetoSequence[0]?.team ?? 'team-a',
+                id: room.masterRoomId,
+                teamAId: room.teamAId,
+                teamBId: room.teamBId,
+                teamALink: room.teamALink,
+                teamBLink: room.teamBLink,
+                spectatorLink: room.spectatorLink,
+                createdAt: room.createdAt.toISOString(),
+                expiresAt: room.expiresAt.toISOString(),
+                maps: room.maps,
+                roundType: room.roundType,
+                teamAReady: room.teamAReady,
+                teamBReady: room.teamBReady,
+                teamAName: room.teamAName,
+                teamBName: room.teamBName,
+                status: room.status as "waiting" | "active" | "completed" | "expired",
+                masterRoomId: room.masterRoomId,
+                teamRole,
+                vetoStarted: room.vetoStarted ?? false,
+                vetoCompleted: room.vetoCompleted ?? false,
+                currentTurn: room.currentTurn,
+                vetoState: room.vetoState as VetoState | null,
+                timestamp: Date.now(),
             };
         }),
 
@@ -472,7 +545,7 @@ export const roomRouter = createTRPCRouter({
                 throw new Error("Not your turn");
             }
 
-            const vetoState = room.vetoState! as VetoState;
+            const vetoState = room.vetoState!;
             if (!vetoState || !Array.isArray(vetoState.vetoSequence)) {
                 throw new Error("Invalid veto state");
             }
@@ -537,6 +610,14 @@ export const roomRouter = createTRPCRouter({
                     vetoCompleted,
                     status: vetoCompleted ? 'completed' : 'active',
                 },
+            });
+
+            // Emit real-time update
+            roomEventEmitter.emit(`room:${room.masterRoomId}:update`, {
+                type: 'veto-action',
+                room: room.masterRoomId,
+                action: newAction,
+                vetoCompleted,
             });
 
             return {
