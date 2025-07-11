@@ -152,9 +152,9 @@ export class SecurityUtils {
             masterRoomId,
             teamAId,
             teamBId,
-            teamALink: `${baseUrl}/veto/room/${teamAId}`,
-            teamBLink: `${baseUrl}/veto/room/${teamBId}`,
-            spectatorLink: `${baseUrl}/veto/room/${masterRoomId}`,
+            teamALink: `${baseUrl}/${teamAId}`,
+            teamBLink: `${baseUrl}/${teamBId}`,
+            spectatorLink: `${baseUrl}/${masterRoomId}`,
         };
     }
 

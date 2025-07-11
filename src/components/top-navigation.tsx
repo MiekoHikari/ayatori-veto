@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '~/components/ui/button';
 import { ModeToggle } from '~/components/theme-toggle';
-import { GamepadIcon, Github, Heart } from 'lucide-react';
+import { Github, Heart } from 'lucide-react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 
 export function TopNavigation() {
@@ -15,9 +15,8 @@ export function TopNavigation() {
             <div className="container mx-auto px-4 py-3 flex items-center justify-between">
                 {/* Left side - Logo and title */}
                 <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-                    <GamepadIcon className="h-7 w-7 text-primary" />
                     <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                        Ayatori
+                        Snowy&apos;s Map Veto
                     </span>
                 </Link>
 
