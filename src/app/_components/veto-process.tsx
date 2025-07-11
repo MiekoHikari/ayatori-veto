@@ -39,6 +39,7 @@ interface VetoProcessProps {
     isSpectator?: boolean;
     teamAName: string | null;
     teamBName: string | null;
+    roundType?: string;
     onVetoComplete?: () => void;
 }
 
@@ -59,6 +60,7 @@ export default function VetoProcess({
     isSpectator = false,
     teamAName,
     teamBName,
+    roundType,
     onVetoComplete
 }: VetoProcessProps) {
     const [showSideSelection, setShowSideSelection] = useState(false);
@@ -158,9 +160,27 @@ export default function VetoProcess({
                 (vetoState.currentStep + 1) >= vetoState.vetoSequence.length;
 
             if (isFinalPick) {
-                // For the final pick, the picking team selects the side
-                setPendingMapId(mapId);
-                setShowSideSelection(true);
+                // For the final pick, check if this is Bo5
+                const isBo5 = roundType === 'bo5';
+
+                if (isBo5) {
+                    // Bo5 final map: The opposing team chooses the side, not the picking team
+                    // Pick the map without side selection, the opposing team will choose later
+                    try {
+                        await makeVetoActionMutation.mutateAsync({
+                            teamId: roomId,
+                            action,
+                            mapId,
+                            // No side selection for Bo5 final map - opposing team will choose
+                        });
+                    } catch (error) {
+                        console.error('Failed to make veto action:', error);
+                    }
+                } else {
+                    // Bo1/Bo3 final map: The picking team selects the side
+                    setPendingMapId(mapId);
+                    setShowSideSelection(true);
+                }
             } else {
                 // For non-final demolition maps, pick without side selection
                 // The opposing team will choose the side

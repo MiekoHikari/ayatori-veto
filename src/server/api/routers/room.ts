@@ -750,12 +750,23 @@ export const roomRouter = createTRPCRouter({
             const isLastMapInSequence = (currentStep + 1) >= vetoState.vetoSequence.length;
             const isLastPickAction = input.action === 'pick' && isLastMapInSequence;
 
-            // For the last pick in the sequence, the picking team selects the side
+            // For the last pick in the sequence, determine side selection based on round type
             // For other picks, the opposing team chooses the side for fairness
             if (input.action === 'pick' && isDemolitionMap && isLastPickAction) {
-                // Last pick: The team making the pick should provide side selection
-                if (!input.side) {
-                    throw new Error("Side selection is required for the final map pick");
+                // Check if this is a Bo5 final map
+                const isBo5 = room.roundType === 'bo5';
+
+                if (isBo5) {
+                    // Bo5 final map: The team that DIDN'T pick the final map chooses the side
+                    // This should be handled by the opposing team, not the picking team
+                    if (input.side) {
+                        throw new Error("For Bo5 final map, the opposing team should choose the side");
+                    }
+                } else {
+                    // Bo1/Bo3 final map: The team making the pick selects the side
+                    if (!input.side) {
+                        throw new Error("Side selection is required for the final map pick");
+                    }
                 }
             } else if (input.action === 'pick' && isDemolitionMap && !isLastPickAction) {
                 // For other demolition maps, opposing team chooses side
@@ -790,7 +801,7 @@ export const roomRouter = createTRPCRouter({
                     ? [...vetoState.pickedMaps, {
                         mapId: input.mapId,
                         pickedBy: teamRole,
-                        side: (isDemolitionMap && isLastPickAction) ? input.side : undefined,
+                        side: (isDemolitionMap && isLastPickAction && room.roundType !== 'bo5') ? input.side : undefined,
                     }]
                     : vetoState.pickedMaps,
                 vetoSequence: vetoState.vetoSequence.map((step, index) =>
@@ -809,9 +820,19 @@ export const roomRouter = createTRPCRouter({
                 vetoCompleted = false;
                 nextTurn = opposingTeam;
             } else if (input.action === 'pick' && isDemolitionMap && isLastPickAction) {
-                // Final map picked with side selection - veto is complete
-                vetoCompleted = true;
-                nextTurn = null;
+                // Final map picked - check if this is Bo5
+                const isBo5 = room.roundType === 'bo5';
+
+                if (isBo5) {
+                    // Bo5 final map: The opposing team chooses the side
+                    const opposingTeam = teamRole === 'team-a' ? 'team-b' : 'team-a';
+                    vetoCompleted = false;
+                    nextTurn = opposingTeam;
+                } else {
+                    // Bo1/Bo3 final map: Side was selected by picking team - veto is complete
+                    vetoCompleted = true;
+                    nextTurn = null;
+                }
             } else if (vetoCompleted) {
                 nextTurn = null;
             } else {

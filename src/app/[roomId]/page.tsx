@@ -453,6 +453,7 @@ export default function RoomPage() {
                                     isSpectator={isSpectator}
                                     teamAName={roomData.teamAName}
                                     teamBName={roomData.teamBName}
+                                    roundType={roomData.roundType}
                                 />
                             </div>
                         )}
