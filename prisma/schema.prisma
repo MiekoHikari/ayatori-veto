@@ -91,6 +91,12 @@ model Room {
     teamBName      String?  // Team B's chosen name
     status         String   @default("waiting") // 'waiting', 'active', 'completed', 'expired'
     
+    // Veto process fields
+    vetoState      Json?    // Current veto state including actions history
+    currentTurn    String?  // Which team's turn it is ('team-a' or 'team-b')
+    vetoStarted    Boolean  @default(false)
+    vetoCompleted  Boolean  @default(false)
+    
     @@index([masterRoomId])
     @@index([teamAId])
     @@index([teamBId])

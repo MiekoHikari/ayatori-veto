@@ -9,6 +9,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Eye, Crown, Clock, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { api } from '~/trpc/react';
+import VetoProcess from '../../_components/veto-process';
 
 interface RoomData {
     id: string;
@@ -28,6 +29,10 @@ interface RoomData {
     status: 'waiting' | 'active' | 'completed' | 'expired';
     masterRoomId?: string;
     teamRole?: 'team-a' | 'team-b';
+    vetoStarted?: boolean;
+    vetoCompleted?: boolean;
+    currentTurn?: string | null;
+    vetoState?: unknown;
 }
 
 export default function RoomPage() {
@@ -355,6 +360,19 @@ export default function RoomPage() {
                                 Room created on {new Date(roomData.createdAt).toLocaleDateString()} at {new Date(roomData.createdAt).toLocaleTimeString()}
                             </div>
                         </div>
+
+                        {/* Veto Process */}
+                        {roomData.teamAReady && roomData.teamBReady && (
+                            <div className="border-t pt-6">
+                                <VetoProcess
+                                    roomId={roomId}
+                                    teamRole={roomData.teamRole}
+                                    isSpectator={isSpectator}
+                                    teamAName={roomData.teamAName}
+                                    teamBName={roomData.teamBName}
+                                />
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>

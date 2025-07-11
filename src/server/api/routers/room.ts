@@ -13,6 +13,61 @@ const createRoomSchema = z.object({
     roundType: z.string(),
 });
 
+// Veto action types
+const VetoActionSchema = z.object({
+    type: z.enum(['ban', 'pick']),
+    mapId: z.string(),
+    side: z.enum(['attack', 'defense']).optional(), // Only for picks on Ranked/Demolition maps
+    team: z.enum(['team-a', 'team-b']),
+    timestamp: z.string(),
+});
+
+// Veto state structure
+const VetoStateSchema = z.object({
+    actions: z.array(VetoActionSchema),
+    availableMaps: z.array(z.string()),
+    pickedMaps: z.array(z.object({
+        mapId: z.string(),
+        pickedBy: z.enum(['team-a', 'team-b']),
+        side: z.enum(['attack', 'defense']).optional(),
+    })),
+    bannedMaps: z.array(z.string()),
+    vetoSequence: z.array(z.object({
+        team: z.enum(['team-a', 'team-b']),
+        action: z.enum(['ban', 'pick']),
+        completed: z.boolean(),
+    })),
+    currentStep: z.number(),
+});
+
+// TypeScript types
+type VetoAction = z.infer<typeof VetoActionSchema>;
+type VetoState = z.infer<typeof VetoStateSchema>;
+
+// Extended room type to include veto fields
+interface RoomWithVeto {
+    id: string;
+    masterRoomId: string;
+    teamAId: string;
+    teamBId: string;
+    teamALink: string;
+    teamBLink: string;
+    spectatorLink: string;
+    createdAt: Date;
+    expiresAt: Date;
+    maps: string[];
+    roundType: string;
+    teamAReady: boolean;
+    teamBReady: boolean;
+    teamAName: string | null;
+    teamBName: string | null;
+    status: string;
+    vetoState?: VetoState | null;
+    currentTurn?: string | null;
+    vetoStarted?: boolean;
+    vetoCompleted?: boolean;
+}
+
 export const roomRouter = createTRPCRouter({
     create: publicProcedure
         .input(createRoomSchema)
@@ -42,7 +97,7 @@ export const roomRouter = createTRPCRouter({
         .query(async ({ ctx, input }) => {
             const room = await ctx.db.room.findUnique({
                 where: { masterRoomId: input.masterRoomId },
-            });
+            }) as RoomWithVeto | null;
 
             if (!room) return null;
 
@@ -62,6 +117,10 @@ export const roomRouter = createTRPCRouter({
                 teamAName: room.teamAName,
                 teamBName: room.teamBName,
                 status: room.status as "waiting" | "active" | "completed" | "expired",
+                vetoStarted: room.vetoStarted ?? false,
+                vetoCompleted: room.vetoCompleted ?? false,
+                currentTurn: room.currentTurn,
+                vetoState: room.vetoState as VetoState | null,
             };
         }),
 
@@ -75,7 +134,7 @@ export const roomRouter = createTRPCRouter({
                         { teamBId: input.teamId },
                     ],
                 },
-            });
+            }) as RoomWithVeto | null;
 
             if (!room) return null;
 
@@ -99,6 +158,10 @@ export const roomRouter = createTRPCRouter({
                 status: room.status as "waiting" | "active" | "completed" | "expired",
                 masterRoomId: room.masterRoomId,
                 teamRole: teamRole,
+                vetoStarted: room.vetoStarted ?? false,
+                vetoCompleted: room.vetoCompleted ?? false,
+                currentTurn: room.currentTurn,
+                vetoState: room.vetoState as VetoState | null,
             };
         }),
 
@@ -255,6 +318,259 @@ export const roomRouter = createTRPCRouter({
                 status: updatedRoom.status as "waiting" | "active" | "completed" | "expired",
                 masterRoomId: updatedRoom.masterRoomId,
                 teamRole: isTeamA ? ("team-a" as const) : ("team-b" as const),
+            };
+        }),
+
+    startVeto: publicProcedure
+        .input(z.object({
+            teamId: z.string(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const room = await ctx.db.room.findFirst({
+                where: {
+                    OR: [
+                        { teamAId: input.teamId },
+                        { teamBId: input.teamId },
+                    ],
+                },
+            }) as RoomWithVeto | null;
+
+            if (!room) {
+                throw new Error("Room not found");
+            }
+
+            // Check if both teams are ready
+            if (!room.teamAReady || !room.teamBReady) {
+                throw new Error("Both teams must be ready before starting veto");
+            }
+
+            // Check if veto already started
+            if (room.vetoStarted) {
+                throw new Error("Veto process has already started");
+            }
+
+            // Generate veto sequence based on round type
+            const generateVetoSequence = (roundType: string, mapCount: number) => {
+                const sequence: Array<{ team: 'team-a' | 'team-b', action: 'ban' | 'pick', completed: boolean }> = [];
+
+                if (roundType === 'bo1') {
+                    // BO1: Ban until 1 map remains, then pick sides
+                    const bansNeeded = mapCount - 1;
+                    for (let i = 0; i < bansNeeded; i++) {
+                        sequence.push({
+                            team: i % 2 === 0 ? 'team-a' : 'team-b',
+                            action: 'ban',
+                            completed: false,
+                        });
+                    }
+                    // The remaining map is automatically picked, no explicit pick action needed
+                } else if (roundType === 'bo3') {
+                    // BO3: Ban until 3 maps remain, then pick them
+                    const bansNeeded = Math.max(0, mapCount - 3);
+                    const picksNeeded = 3;
+
+                    // Alternating bans
+                    for (let i = 0; i < bansNeeded; i++) {
+                        sequence.push({
+                            team: i % 2 === 0 ? 'team-a' : 'team-b',
+                            action: 'ban',
+                            completed: false,
+                        });
+                    }
+
+                    // Alternating picks for the remaining maps
+                    for (let i = 0; i < picksNeeded; i++) {
+                        sequence.push({
+                            team: i % 2 === 0 ? 'team-a' : 'team-b',
+                            action: 'pick',
+                            completed: false,
+                        });
+                    }
+                } else if (roundType === 'bo5') {
+                    // BO5: Ban until 5 maps remain, then pick them
+                    const bansNeeded = Math.max(0, mapCount - 5);
+                    const picksNeeded = 5;
+
+                    // Alternating bans
+                    for (let i = 0; i < bansNeeded; i++) {
+                        sequence.push({
+                            team: i % 2 === 0 ? 'team-a' : 'team-b',
+                            action: 'ban',
+                            completed: false,
+                        });
+                    }
+
+                    // Alternating picks for the remaining maps
+                    for (let i = 0; i < picksNeeded; i++) {
+                        sequence.push({
+                            team: i % 2 === 0 ? 'team-a' : 'team-b',
+                            action: 'pick',
+                            completed: false,
+                        });
+                    }
+                }
+
+                return sequence;
+            };
+
+            const vetoSequence = generateVetoSequence(room.roundType, room.maps.length);
+            const initialVetoState: VetoState = {
+                actions: [],
+                availableMaps: [...room.maps],
+                pickedMaps: [],
+                bannedMaps: [],
+                vetoSequence,
+                currentStep: 0,
+            };
+
+            await ctx.db.room.update({
+                where: { id: room.id },
+                data: {
+                    vetoStarted: true,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+                    vetoState: initialVetoState as any,
+                    currentTurn: vetoSequence[0]?.team ?? 'team-a',
+                    status: 'active',
+                },
+            });
+
+            return {
+                success: true,
+                vetoState: initialVetoState,
+                currentTurn: vetoSequence[0]?.team ?? 'team-a',
+            };
+        }),
+
+    makeVetoAction: publicProcedure
+        .input(z.object({
+            teamId: z.string(),
+            action: z.enum(['ban', 'pick']),
+            mapId: z.string(),
+            side: z.enum(['attack', 'defense']).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const room = await ctx.db.room.findFirst({
+                where: {
+                    OR: [
+                        { teamAId: input.teamId },
+                        { teamBId: input.teamId },
+                    ],
+                },
+            }) as RoomWithVeto | null;
+
+            if (!room) {
+                throw new Error("Room not found");
+            }
+
+            if (!room.vetoStarted || room.vetoCompleted) {
+                throw new Error("Veto process is not active");
+            }
+
+            const teamRole = room.teamAId === input.teamId ? 'team-a' : 'team-b';
+
+            if (room.currentTurn !== teamRole) {
+                throw new Error("Not your turn");
+            }
+
+            const vetoState = room.vetoState! as VetoState;
+            if (!vetoState || !Array.isArray(vetoState.vetoSequence)) {
+                throw new Error("Invalid veto state");
+            }
+
+            const currentStep = vetoState.currentStep ?? 0;
+            const currentSequenceItem = vetoState.vetoSequence[currentStep];
+
+            if (!currentSequenceItem || currentSequenceItem.action !== input.action) {
+                throw new Error(`Expected ${currentSequenceItem?.action} action, got ${input.action}`);
+            }
+
+            // Validate map is available
+            if (!vetoState.availableMaps.includes(input.mapId)) {
+                throw new Error("Map is not available for selection");
+            }
+
+            // For picks, side selection is required for Ranked/Demolition maps
+            if (input.action === 'pick' && !input.side) {
+                throw new Error("Side selection is required for map picks");
+            }
+
+            // Create the action
+            const newAction: VetoAction = {
+                type: input.action,
+                mapId: input.mapId,
+                side: input.side,
+                team: teamRole,
+                timestamp: new Date().toISOString(),
+            };
+
+            // Update veto state
+            const newVetoState: VetoState = {
+                ...vetoState,
+                actions: [...vetoState.actions, newAction],
+                availableMaps: vetoState.availableMaps.filter((m) => m !== input.mapId),
+                bannedMaps: input.action === 'ban'
+                    ? [...vetoState.bannedMaps, input.mapId]
+                    : vetoState.bannedMaps,
+                pickedMaps: input.action === 'pick'
+                    ? [...vetoState.pickedMaps, {
+                        mapId: input.mapId,
+                        pickedBy: teamRole,
+                        side: input.side,
+                    }]
+                    : vetoState.pickedMaps,
+                vetoSequence: vetoState.vetoSequence.map((step, index) =>
+                    index === currentStep ? { ...step, completed: true } : step
+                ),
+                currentStep: currentStep + 1,
+            };
+
+            // Check if veto is completed
+            const vetoCompleted = newVetoState.currentStep >= newVetoState.vetoSequence.length;
+            const nextTurn = vetoCompleted ? null : newVetoState.vetoSequence[newVetoState.currentStep]?.team;
+
+            await ctx.db.room.update({
+                where: { id: room.id },
+                data: {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+                    vetoState: newVetoState as any,
+                    currentTurn: nextTurn,
+                    vetoCompleted,
+                    status: vetoCompleted ? 'completed' : 'active',
+                },
+            });
+
+            return {
+                success: true,
+                vetoState: newVetoState,
+                currentTurn: nextTurn,
+                vetoCompleted,
+            };
+        }),
+
+    getVetoState: publicProcedure
+        .input(z.object({
+            roomId: z.string(),
+        }))
+        .query(async ({ ctx, input }) => {
+            const room = await ctx.db.room.findFirst({
+                where: {
+                    OR: [
+                        { masterRoomId: input.roomId },
+                        { teamAId: input.roomId },
+                        { teamBId: input.roomId },
+                    ],
+                },
+            }) as RoomWithVeto | null;
+
+            if (!room) {
+                return null;
+            }
+
+            return {
+                vetoStarted: room.vetoStarted ?? false,
+                vetoCompleted: room.vetoCompleted ?? false,
+                currentTurn: room.currentTurn,
+                vetoState: room.vetoState as VetoState | null,
             };
         }),
 });
