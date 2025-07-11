@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/admin/rooms",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
