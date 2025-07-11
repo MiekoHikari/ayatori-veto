@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/badge';
@@ -10,6 +11,17 @@ import { Label } from '~/components/ui/label';
 import { Eye, Crown, Clock, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { api } from '~/trpc/react';
 import VetoProcess from '../../_components/veto-process';
+
+const MAP_DATA: Record<string, { name: string; image: string; isDemolition: boolean }> = {
+    'area88': { name: 'Area 88', image: '/maps/Area88.png', isDemolition: true },
+    'base404': { name: 'Base 404', image: '/maps/Base404.png', isDemolition: true },
+    'port_euler': { name: 'Port Euler', image: '/maps/PortEuler.png', isDemolition: true },
+    'space_lab': { name: 'Space Lab', image: '/maps/SpaceLab.png', isDemolition: true },
+    'windy_town': { name: 'Windy Town', image: '/maps/WindyTown.png', isDemolition: true },
+    'cauchy_street': { name: 'Cauchy Street', image: '/maps/CauchyStreet.png', isDemolition: true },
+    'cosmite': { name: 'Cosmite', image: '/maps/Cosmite.png', isDemolition: true },
+    'ocarnus': { name: 'Ocarnus', image: '/maps/Ocarnus.png', isDemolition: true },
+};
 
 interface RoomData {
     id: string;
@@ -368,8 +380,8 @@ export default function RoomPage() {
                             </div>
                         )}
 
-                        {/* Team Actions */}
-                        {!isSpectator && (
+                        {/* Team Actions - Hide when veto started */}
+                        {!isSpectator && !roomData.vetoStarted && (
                             <div className="border-t pt-4">
                                 <div className="flex items-center justify-between">
                                     <div className="text-sm text-muted-foreground">
@@ -395,24 +407,42 @@ export default function RoomPage() {
                             </div>
                         )}
 
-                        {/* Maps */}
-                        <div className="border-t pt-4">
-                            <h3 className="font-semibold mb-3">Maps in Pool</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                {roomData.maps.map((map) => (
-                                    <Badge key={map} variant="outline" className="justify-center py-2">
-                                        {map}
-                                    </Badge>
-                                ))}
-                            </div>
-                        </div>
+                        {/* Maps - Hide when veto started */}
+                        {!roomData.vetoStarted && (
+                            <div className="border-t pt-4">
+                                <h3 className="font-semibold mb-4">Maps in Pool</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {roomData.maps.map((mapId) => {
+                                        const mapData = MAP_DATA[mapId];
+                                        return (
+                                            <div key={mapId} className="group relative">
+                                                <div className="relative w-full aspect-video rounded-lg overflow-hidden border-2 border-muted transition-all duration-300 hover:border-primary/50 hover:shadow-lg">
+                                                    <Image
+                                                        src={mapData?.image ?? '/maps/placeholder.png'}
+                                                        alt={mapData?.name ?? mapId}
+                                                        fill
+                                                        className="object-cover transition-all duration-200 group-hover:brightness-110"
+                                                    />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                        {/* Room Info */}
-                        <div className="border-t pt-4">
-                            <div className="text-sm text-muted-foreground">
-                                Room created on {new Date(roomData.createdAt).toLocaleDateString()} at {new Date(roomData.createdAt).toLocaleTimeString()}
+                                                    {/* Map name overlay */}
+                                                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                                                        <h4 className="text-white font-semibold text-sm mb-1">
+                                                            {mapData?.name ?? mapId}
+                                                        </h4>
+                                                        {mapData?.isDemolition && (
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                Demolition
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Veto Process */}
                         {roomData.teamAReady && roomData.teamBReady && (
@@ -429,6 +459,13 @@ export default function RoomPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Footer with room creation info */}
+            <div className="mt-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                    Room created on {new Date(roomData.createdAt).toLocaleDateString()} at {new Date(roomData.createdAt).toLocaleTimeString()}
+                </p>
+            </div>
         </div>
     );
 }
