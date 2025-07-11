@@ -1,6 +1,6 @@
 "use client";
 import { ArrowLeft } from 'lucide-react';
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import { Button } from '~/components/ui/button';
 import RoomCreation from './_components/room-creation';
 import MapSelection from './_components/map-selection';
@@ -55,7 +55,9 @@ function Veto() {
                         All settings will be saved in the URL so you can easily share your preset with others.
                     </p>
                 </div>
-                <MapSelection onMapsSelected={handleMapsSelected} />
+                <Suspense fallback={<div>Loading map selection...</div>}>
+                    <MapSelection onMapsSelected={handleMapsSelected} />
+                </Suspense>
             </div>
         );
     }

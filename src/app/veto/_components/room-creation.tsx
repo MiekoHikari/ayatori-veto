@@ -7,6 +7,7 @@ import { Badge } from '~/components/ui/badge';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Copy, Users, Eye, Crown, Clock } from 'lucide-react';
+import { api } from '~/trpc/react';
 
 interface RoomData {
     id: string;
@@ -34,6 +35,8 @@ export default function RoomCreation({ maps, roundType, onRoomCreated }: RoomCre
     const [isCreating, setIsCreating] = useState(false);
     const [roomData, setRoomData] = useState<RoomData | null>(null);
 
+    const createRoomMutation = api.room.create.useMutation();
+
     const createRoom = async () => {
         setIsCreating(true);
 
@@ -42,7 +45,6 @@ export default function RoomCreation({ maps, roundType, onRoomCreated }: RoomCre
             const masterRoomId = generateRoomId();
             const teamAId = generateRoomId();
             const teamBId = generateRoomId();
-            const createdAt = new Date().toISOString();
             const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
 
             // Create room links with separate IDs for teams
@@ -51,47 +53,18 @@ export default function RoomCreation({ maps, roundType, onRoomCreated }: RoomCre
             const teamBLink = `${baseUrl}/veto/room/${teamBId}`;
             const spectatorLink = `${baseUrl}/veto/room/${masterRoomId}`;
 
-            const newRoomData: RoomData = {
-                id: masterRoomId,
+            // Create room using tRPC
+            const newRoomData = await createRoomMutation.mutateAsync({
+                masterRoomId,
                 teamAId,
                 teamBId,
                 teamALink,
                 teamBLink,
                 spectatorLink,
-                createdAt,
                 expiresAt,
                 maps,
                 roundType,
-                teamAReady: false,
-                teamBReady: false,
-                status: 'waiting'
-            };
-
-            // Store room data on server
-            const response = await fetch('/api/rooms', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(newRoomData),
             });
-
-            if (!response.ok) {
-                throw new Error('Failed to create room on server');
-            }
-
-            // Also store locally as backup
-            localStorage.setItem(`room_${masterRoomId}`, JSON.stringify(newRoomData));
-            localStorage.setItem(`room_${teamAId}`, JSON.stringify({
-                ...newRoomData,
-                masterRoomId,
-                teamRole: 'team-a'
-            }));
-            localStorage.setItem(`room_${teamBId}`, JSON.stringify({
-                ...newRoomData,
-                masterRoomId,
-                teamRole: 'team-b'
-            }));
 
             setRoomData(newRoomData);
             onRoomCreated(newRoomData);
