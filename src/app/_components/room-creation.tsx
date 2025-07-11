@@ -51,9 +51,9 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
 
             // Create room links with separate IDs for teams
             const baseUrl = window.location.origin;
-            const teamALink = `${baseUrl}/room/${teamAId}`;
-            const teamBLink = `${baseUrl}/room/${teamBId}`;
-            const spectatorLink = `${baseUrl}/room/${masterRoomId}`;
+            const teamALink = `${baseUrl}/${teamAId}`;
+            const teamBLink = `${baseUrl}/${teamBId}`;
+            const spectatorLink = `${baseUrl}/${masterRoomId}`;
 
             // Create room using tRPC
             await createRoomMutation.mutateAsync({
