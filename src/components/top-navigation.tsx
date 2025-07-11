@@ -75,7 +75,7 @@ export function TopNavigation() {
                         className="text-muted-foreground hover:text-foreground"
                     >
                         <Link
-                            href="https://github.com/your-username/ayatori-app"
+                            href="https://github.com/miekohikari/ayatori-veto"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center"
@@ -93,7 +93,7 @@ export function TopNavigation() {
                         className="text-muted-foreground hover:text-red-500 transition-colors"
                     >
                         <Link
-                            href="https://ko-fi.com/your-kofi"
+                            href="https://ko-fi.com/sn0_y"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center"
