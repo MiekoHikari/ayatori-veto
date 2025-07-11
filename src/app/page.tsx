@@ -24,7 +24,7 @@ interface RoomData {
   status: 'waiting' | 'active' | 'completed' | 'expired';
 }
 
-function Veto() {
+function VetoContent() {
   const searchParams = useSearchParams();
   const [showVeto, setShowVeto] = useState(false);
   const [roomData, setRoomData] = useState<RoomData | null>(null);
@@ -67,9 +67,7 @@ function Veto() {
             All settings will be saved in the URL so you can easily share your preset with others.
           </p>
         </div>
-        <Suspense fallback={<div>Loading map selection...</div>}>
-          <MapSelection onMapsSelectedAction={handleMapsSelected} />
-        </Suspense>
+        <MapSelection onMapsSelectedAction={handleMapsSelected} />
       </div>
     );
   }
@@ -134,6 +132,14 @@ function Veto() {
       </div>
     </div>
   )
+}
+
+function Veto() {
+  return (
+    <Suspense fallback={<div className="container mx-auto p-6"><div className="text-center"><p>Loading...</p></div></div>}>
+      <VetoContent />
+    </Suspense>
+  );
 }
 
 export default Veto

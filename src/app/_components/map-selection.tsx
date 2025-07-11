@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
@@ -42,7 +42,7 @@ interface MapSelectionProps {
     onMapsSelectedAction: (maps: string[], roundType: string) => void;
 }
 
-export default function MapSelection({ onMapsSelectedAction: onMapsSelected }: MapSelectionProps) {
+function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelectionProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
@@ -280,5 +280,24 @@ export default function MapSelection({ onMapsSelectedAction: onMapsSelected }: M
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+export default function MapSelection({ onMapsSelectedAction }: MapSelectionProps) {
+    return (
+        <Suspense fallback={
+            <Card className="w-full max-w-4xl mx-auto">
+                <CardHeader>
+                    <CardTitle>Loading Map Selection...</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-center py-12">
+                        <p className="text-muted-foreground">Loading maps...</p>
+                    </div>
+                </CardContent>
+            </Card>
+        }>
+            <MapSelectionContent onMapsSelectedAction={onMapsSelectedAction} />
+        </Suspense>
     );
 }
