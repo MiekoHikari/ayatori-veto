@@ -12,8 +12,8 @@ import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export const metadata: Metadata = {
-  title: "Ayatori - Professional Map Veto Tool",
-  description: "Professional esports map veto tool for competitive gaming",
+  title: "Strinova Map Veto",
+  description: "Map Veto for Competitive Strinova Gaming (Developed by @Sn0_y in Discord)",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

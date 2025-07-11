@@ -10,6 +10,21 @@ import {
 } from "~/lib/rate-limiter";
 import { RoomValidation, SecurityUtils } from "~/lib/room-validation";
 
+// Helper function to determine team roles based on side selection
+const determineTeamRoles = (pickedBy: 'team-a' | 'team-b', selectedSide: 'attack' | 'defense') => {
+    if (selectedSide === 'attack') {
+        return {
+            attackingTeam: pickedBy,
+            defendingTeam: pickedBy === 'team-a' ? 'team-b' as const : 'team-a' as const
+        };
+    } else {
+        return {
+            attackingTeam: pickedBy === 'team-a' ? 'team-b' as const : 'team-a' as const,
+            defendingTeam: pickedBy
+        };
+    }
+};
+
 // Global event emitter for room updates
 const roomEventEmitter = new EventEmitter();
 
@@ -37,6 +52,8 @@ const VetoStateSchema = z.object({
         mapId: z.string(),
         pickedBy: z.enum(['team-a', 'team-b']),
         side: z.enum(['attack', 'defense']).optional(),
+        attackingTeam: z.enum(['team-a', 'team-b']).optional(),
+        defendingTeam: z.enum(['team-a', 'team-b']).optional(),
     })),
     bannedMaps: z.array(z.string()),
     vetoSequence: z.array(z.object({
@@ -74,6 +91,43 @@ interface RoomWithVeto {
     vetoStarted?: boolean;
     vetoCompleted?: boolean;
 }
+
+// Helper function to get human-readable team role information for a picked map
+export const getTeamRolesForMap = (
+    pickedMap: {
+        mapId: string;
+        pickedBy: 'team-a' | 'team-b';
+        side?: 'attack' | 'defense';
+        attackingTeam?: 'team-a' | 'team-b';
+        defendingTeam?: 'team-a' | 'team-b';
+    },
+    teamAName?: string | null,
+    teamBName?: string | null
+) => {
+    if (!pickedMap.attackingTeam || !pickedMap.defendingTeam) {
+        return {
+            attacking: 'Pending side selection',
+            defending: 'Pending side selection',
+            sideSelected: false
+        };
+    }
+
+    const attackingName = pickedMap.attackingTeam === 'team-a'
+        ? (teamAName ?? 'Team A')
+        : (teamBName ?? 'Team B');
+
+    const defendingName = pickedMap.defendingTeam === 'team-a'
+        ? (teamAName ?? 'Team A')
+        : (teamBName ?? 'Team B');
+
+    return {
+        attacking: attackingName,
+        defending: defendingName,
+        sideSelected: true,
+        attackingTeam: pickedMap.attackingTeam,
+        defendingTeam: pickedMap.defendingTeam
+    };
+};
 
 export const roomRouter = createTRPCRouter({
     create: publicProcedure
@@ -796,11 +850,30 @@ export const roomRouter = createTRPCRouter({
                     ? [...vetoState.bannedMaps, input.mapId]
                     : vetoState.bannedMaps,
                 pickedMaps: input.action === 'pick'
-                    ? [...vetoState.pickedMaps, {
-                        mapId: input.mapId,
-                        pickedBy: teamRole,
-                        side: (isDemolitionMap && isLastPickAction && room.roundType !== 'bo5') ? input.side : undefined,
-                    }]
+                    ? (() => {
+                        const pickedMapSide = (isDemolitionMap && isLastPickAction && room.roundType !== 'bo5') ? input.side : undefined;
+
+                        const pickedMap: {
+                            mapId: string;
+                            pickedBy: 'team-a' | 'team-b';
+                            side?: 'attack' | 'defense';
+                            attackingTeam?: 'team-a' | 'team-b';
+                            defendingTeam?: 'team-a' | 'team-b';
+                        } = {
+                            mapId: input.mapId,
+                            pickedBy: teamRole,
+                            side: pickedMapSide,
+                        };
+
+                        // If side is selected, determine team roles
+                        if (pickedMapSide) {
+                            const teamRoles = determineTeamRoles(teamRole, pickedMapSide);
+                            pickedMap.attackingTeam = teamRoles.attackingTeam;
+                            pickedMap.defendingTeam = teamRoles.defendingTeam;
+                        }
+
+                        return [...vetoState.pickedMaps, pickedMap];
+                    })()
                     : vetoState.pickedMaps,
                 vetoSequence: vetoState.vetoSequence.map((step, index) =>
                     index === currentStep ? { ...step, completed: true } : step
@@ -929,7 +1002,13 @@ export const roomRouter = createTRPCRouter({
             // Find the picked map without a side and update it
             const updatedPickedMaps = vetoState.pickedMaps.map((pick) => {
                 if (pick.mapId === input.mapId && !pick.side) {
-                    return { ...pick, side: input.side };
+                    const teamRoles = determineTeamRoles(teamRole, input.side);
+                    return {
+                        ...pick,
+                        side: input.side,
+                        attackingTeam: teamRoles.attackingTeam,
+                        defendingTeam: teamRoles.defendingTeam
+                    };
                 }
                 return pick;
             });

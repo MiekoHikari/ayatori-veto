@@ -23,6 +23,8 @@ interface VetoState {
         mapId: string;
         pickedBy: 'team-a' | 'team-b';
         side?: 'attack' | 'defense';
+        attackingTeam?: 'team-a' | 'team-b';
+        defendingTeam?: 'team-a' | 'team-b';
     }>;
     bannedMaps: string[];
     vetoSequence: Array<{
@@ -365,26 +367,61 @@ export default function VetoProcess({
                                                             className="object-cover"
                                                         />
                                                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                                                    </div>
-                                                    <div className="flex-1">
+                                                    </div>                                    <div className="flex-1">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <span className="font-medium text-lg">{getMapDisplayName(pick.mapId)}</span>
                                                             <Badge variant="outline" className="text-xs">
                                                                 Map {index + 1}
                                                             </Badge>
                                                         </div>
-                                                        <div className="text-sm text-muted-foreground">
+                                                        <div className="text-sm text-muted-foreground mb-2">
                                                             Picked by {getTeamDisplayName(pick.pickedBy)}
                                                         </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-2">
-                                                        {pick.side && (
+                                                        {pick.attackingTeam && pick.defendingTeam && (
+                                                            <div className="flex items-center gap-4 text-xs">
+                                                                <div className="flex items-center gap-1 text-red-600">
+                                                                    <Swords className="w-3 h-3" />
+                                                                    <span className="font-medium">ATK:</span>
+                                                                    <span>{getTeamDisplayName(pick.attackingTeam)}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 text-blue-600">
+                                                                    <Shield className="w-3 h-3" />
+                                                                    <span className="font-medium">DEF:</span>
+                                                                    <span>{getTeamDisplayName(pick.defendingTeam)}</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {!pick.attackingTeam && !pick.defendingTeam && pick.side && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Side selection pending...
+                                                            </div>
+                                                        )}
+                                                    </div>                                    <div className="flex flex-col items-end gap-2">
+                                                        {pick.side && pick.attackingTeam && pick.defendingTeam && (
                                                             <Badge
-                                                                variant={pick.side === 'attack' ? 'destructive' : 'secondary'}
-                                                                className="flex items-center gap-1"
+                                                                variant="default"
+                                                                className="flex items-center gap-1 bg-green-600"
                                                             >
-                                                                {pick.side === 'attack' ? <Zap className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
-                                                                {pick.side === 'attack' ? 'Attacking' : 'Defending'}
+                                                                <CheckCircle className="w-3 h-3" />
+                                                                Sides Set
+                                                            </Badge>
+                                                        )}
+                                                        {pick.side && (!pick.attackingTeam || !pick.defendingTeam) && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="flex items-center gap-1 border-yellow-500 text-yellow-600"
+                                                            >
+                                                                <Clock className="w-3 h-3" />
+                                                                Pending
+                                                            </Badge>
+                                                        )}
+                                                        {!pick.side && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="flex items-center gap-1 border-gray-500 text-gray-600"
+                                                            >
+                                                                <Clock className="w-3 h-3" />
+                                                                No Side
                                                             </Badge>
                                                         )}
                                                     </div>
