@@ -8,6 +8,8 @@ import { ThemeProvider } from "~/components/theme-provider";
 import { TopNavigation } from "~/components/top-navigation";
 import { AuthProvider } from "~/components/auth-provider";
 
+import { Analytics } from "@vercel/analytics/next"
+
 export const metadata: Metadata = {
   title: "Ayatori - Professional Map Veto Tool",
   description: "Professional esports map veto tool for competitive gaming",
@@ -31,6 +33,7 @@ export default function RootLayout({
           disableTransitionOnChange>
           <AuthProvider>
             <TRPCReactProvider>
+              <Analytics />
               <TopNavigation />
               <main className="min-h-screen bg-background">
                 {children}
