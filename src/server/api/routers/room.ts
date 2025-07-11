@@ -157,9 +157,7 @@ export const roomRouter = createTRPCRouter({
             }
 
             // 6. Generate secure room data
-            const baseUrl = process.env.NEXTAUTH_URL ??
-                process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-                'http://localhost:3000';
+            const baseUrl = "https://strinova-veto.vercel.app";
             const roomLinks = SecurityUtils.generateRoomLinks(baseUrl);
             const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
