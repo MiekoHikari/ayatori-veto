@@ -9,6 +9,7 @@ import { TopNavigation } from "~/components/top-navigation";
 import { AuthProvider } from "~/components/auth-provider";
 
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export const metadata: Metadata = {
   title: "Ayatori - Professional Map Veto Tool",
@@ -34,6 +35,7 @@ export default function RootLayout({
           <AuthProvider>
             <TRPCReactProvider>
               <Analytics />
+              <SpeedInsights />
               <TopNavigation />
               <main className="min-h-screen bg-background">
                 {children}
