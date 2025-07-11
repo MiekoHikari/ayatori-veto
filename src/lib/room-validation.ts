@@ -10,10 +10,10 @@ export class RoomValidation {
     static validateMaps(maps: string[], roundType: string): ValidationResult {
         const errors: string[] = [];
 
-        // Available maps (should match your public/maps folder)
+        // Available maps (should match your frontend map IDs)
         const availableMaps = [
-            'Area88', 'Base404', 'CauchyStreet', 'Cosmite',
-            'Ocarnus', 'PortEuler', 'SpaceLab', 'WindyTown'
+            'area88', 'base404', 'cauchy_street', 'cosmite',
+            'ocarnus', 'port_euler', 'space_lab', 'windy_town'
         ];
 
         // Check minimum maps based on round type
