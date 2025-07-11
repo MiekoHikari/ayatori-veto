@@ -12,17 +12,7 @@ import { Eye, Crown, Clock, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { api } from '~/trpc/react';
 import VetoProcess from '../_components/veto-process';
 import { type RoomData } from '~/types/room';
-
-const MAP_DATA: Record<string, { name: string; image: string; isDemolition: boolean }> = {
-    'area88': { name: 'Area 88', image: '/maps/Area88.png', isDemolition: true },
-    'base404': { name: 'Base 404', image: '/maps/Base404.png', isDemolition: true },
-    'port_euler': { name: 'Port Euler', image: '/maps/PortEuler.png', isDemolition: true },
-    'space_lab': { name: 'Space Lab', image: '/maps/SpaceLab.png', isDemolition: true },
-    'windy_town': { name: 'Windy Town', image: '/maps/WindyTown.png', isDemolition: true },
-    'cauchy_street': { name: 'Cauchy Street', image: '/maps/CauchyStreet.png', isDemolition: true },
-    'cosmite': { name: 'Cosmite', image: '/maps/Cosmite.png', isDemolition: true },
-    'ocarnus': { name: 'Ocarnus', image: '/maps/Ocarnus.png', isDemolition: true },
-};
+import { MAP_DATA, getRoundLabel } from '~/constants/maps';
 
 export default function RoomPage() {
     const params = useParams();
@@ -172,15 +162,6 @@ export default function RoomPage() {
         } else {
             return `${minutes}m remaining`;
         }
-    };
-
-    const getRoundLabel = (roundValue: string) => {
-        const roundOptions = [
-            { value: 'bo1', label: 'Best of 1' },
-            { value: 'bo3', label: 'Best of 3' },
-            { value: 'bo5', label: 'Best of 5' },
-        ];
-        return roundOptions.find(opt => opt.value === roundValue)?.label ?? roundValue;
     };
 
     const isSpectator = !roomData?.teamRole;

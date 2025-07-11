@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { ALL_MAPS, ROUND_OPTIONS } from '~/constants/maps';
 
 export interface ValidationResult {
     isValid: boolean;
@@ -10,20 +11,17 @@ export class RoomValidation {
     static validateMaps(maps: string[], roundType: string): ValidationResult {
         const errors: string[] = [];
 
-        // Available maps (should match your frontend map IDs)
-        const availableMaps = [
-            'area88', 'base404', 'cauchy_street', 'cosmite',
-            'ocarnus', 'port_euler', 'space_lab', 'windy_town'
-        ];
+        // Get available maps from constants
+        const availableMaps = ALL_MAPS.map(map => map.id);
 
         // Check minimum maps based on round type
-        const minMapsRequired = {
+        const minMapsRequired: Record<string, number> = {
             'bo1': 3, // At least 3 for ban-ban-pick
             'bo3': 7, // Full veto process
             'bo5': 7, // Full veto process
         };
 
-        const minRequired = minMapsRequired[roundType as keyof typeof minMapsRequired] || 7;
+        const minRequired = minMapsRequired[roundType] ?? 7;
 
         if (maps.length < minRequired) {
             errors.push(`Minimum ${minRequired} maps required for ${roundType.toUpperCase()}`);
@@ -54,7 +52,7 @@ export class RoomValidation {
     // Validate round type
     static validateRoundType(roundType: string): ValidationResult {
         const errors: string[] = [];
-        const validRoundTypes = ['bo1', 'bo3', 'bo5'];
+        const validRoundTypes = ROUND_OPTIONS.map(option => option.value);
 
         if (!validRoundTypes.includes(roundType)) {
             errors.push(`Invalid round type. Must be one of: ${validRoundTypes.join(', ')}`);

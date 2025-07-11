@@ -8,35 +8,9 @@ import { Checkbox } from '~/components/ui/checkbox';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
-
-const ALL_MAPS = [
-    { id: 'area88', name: 'Area 88', categories: ['Demolition', 'Ranked'], image: '/maps/Area88.png' },
-    { id: 'base404', name: 'Base 404', categories: ['Demolition', 'Ranked'], image: '/maps/Base404.png' },
-    { id: 'port_euler', name: 'Port Euler', categories: ['Demolition'], image: '/maps/PortEuler.png' },
-    { id: 'space_lab', name: 'Space Lab', categories: ['Demolition', 'Ranked'], image: '/maps/SpaceLab.png' },
-    { id: 'windy_town', name: 'Windy Town', categories: ['Demolition', 'Ranked'], image: '/maps/WindyTown.png' },
-    { id: 'cauchy_street', name: 'Cauchy Street', categories: ['Demolition', 'Ranked'], image: '/maps/CauchyStreet.png' },
-    { id: 'cosmite', name: 'Cosmite', categories: ['Demolition', 'Ranked'], image: '/maps/Cosmite.png' },
-    { id: 'ocarnus', name: 'Ocarnus', categories: ['Demolition', 'Ranked'], image: '/maps/Ocarnus.png' },
-
-];
-
-// Get all unique categories from maps
-const getAllCategories = () => {
-    const categories = new Set<string>();
-    ALL_MAPS.forEach(map => {
-        map.categories.forEach(category => categories.add(category));
-    });
-    return ['All', ...Array.from(categories).sort()];
-};
+import { ALL_MAPS, ROUND_OPTIONS, getAllCategories, getRoundOption, filterMapsByCategory, validateMapIds, isValidRoundType } from '~/constants/maps';
 
 const CATEGORIES = getAllCategories();
-
-const ROUND_OPTIONS = [
-    { value: 'bo1', label: 'Best of 1', maps: 1 },
-    { value: 'bo3', label: 'Best of 3', maps: 3 },
-    { value: 'bo5', label: 'Best of 5', maps: 5 },
-];
 
 interface MapSelectionProps {
     onMapsSelectedAction: (maps: string[], roundType: string) => void;
@@ -55,13 +29,11 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
         const roundFromUrl = searchParams.get('round');
 
         if (mapsFromUrl) {
-            const maps = mapsFromUrl.split(',').filter(map =>
-                ALL_MAPS.some(m => m.id === map)
-            );
+            const maps = validateMapIds(mapsFromUrl.split(','));
             setSelectedMaps(maps);
         }
 
-        if (roundFromUrl && ROUND_OPTIONS.some(option => option.value === roundFromUrl)) {
+        if (roundFromUrl && isValidRoundType(roundFromUrl)) {
             setRoundType(roundFromUrl);
         }
     }, [searchParams]);
@@ -89,9 +61,7 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
         );
     };
 
-    const filteredMaps = categoryFilter === 'All'
-        ? ALL_MAPS
-        : ALL_MAPS.filter(map => map.categories.includes(categoryFilter));
+    const filteredMaps = filterMapsByCategory(categoryFilter);
 
     const selectAll = () => {
         setSelectedMaps(filteredMaps.map(map => map.id));
@@ -145,7 +115,7 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
                             </Select>
                         </div>
                         <Badge variant="secondary" className="text-xs">
-                            {ROUND_OPTIONS.find(opt => opt.value === roundType)?.maps} map(s) needed
+                            {getRoundOption(roundType)?.maps} map(s) needed
                         </Badge>
                     </div>
 
@@ -266,7 +236,7 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
                     <div className="flex flex-col items-end gap-2">
                         {selectedMaps.length > 0 && (
                             <p className="text-sm text-muted-foreground">
-                                Selected: {selectedMaps.length} maps for {ROUND_OPTIONS.find(opt => opt.value === roundType)?.label}
+                                Selected: {selectedMaps.length} maps for {getRoundOption(roundType)?.label}
                             </p>
                         )}
                         <Button
@@ -274,7 +244,7 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
                             disabled={selectedMaps.length === 0}
                             className="min-w-24"
                         >
-                            Continue with {ROUND_OPTIONS.find(opt => opt.value === roundType)?.label}
+                            Continue with {getRoundOption(roundType)?.label}
                         </Button>
                     </div>
                 </div>

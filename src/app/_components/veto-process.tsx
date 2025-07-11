@@ -7,6 +7,7 @@ import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/badge';
 import { Clock, Ban, Target, CheckCircle, Swords, Shield, Zap } from 'lucide-react';
 import { api } from '~/trpc/react';
+import { MAP_DATA, getMapName } from '~/constants/maps';
 
 interface VetoAction {
     type: 'ban' | 'pick';
@@ -44,17 +45,6 @@ interface VetoProcessProps {
     roundType?: string;
     onVetoComplete?: () => void;
 }
-
-const MAP_DATA: Record<string, { name: string; image: string; isDemolition: boolean }> = {
-    'area88': { name: 'Area 88', image: '/maps/Area88.png', isDemolition: true },
-    'base404': { name: 'Base 404', image: '/maps/Base404.png', isDemolition: true },
-    'port_euler': { name: 'Port Euler', image: '/maps/PortEuler.png', isDemolition: true },
-    'space_lab': { name: 'Space Lab', image: '/maps/SpaceLab.png', isDemolition: true },
-    'windy_town': { name: 'Windy Town', image: '/maps/WindyTown.png', isDemolition: true },
-    'cauchy_street': { name: 'Cauchy Street', image: '/maps/CauchyStreet.png', isDemolition: true },
-    'cosmite': { name: 'Cosmite', image: '/maps/Cosmite.png', isDemolition: true },
-    'ocarnus': { name: 'Ocarnus', image: '/maps/Ocarnus.png', isDemolition: true },
-};
 
 export default function VetoProcess({
     roomId,
@@ -244,7 +234,7 @@ export default function VetoProcess({
     };
 
     const getMapDisplayName = (mapId: string) => {
-        return MAP_DATA[mapId]?.name ?? mapId;
+        return getMapName(mapId);
     };
 
     const getTeamDisplayName = (team: 'team-a' | 'team-b') => {

@@ -9,6 +9,7 @@ import { Label } from '~/components/ui/label';
 import { Copy, Users, Eye, Crown, Clock } from 'lucide-react';
 import { api } from '~/trpc/react';
 import { type RoomData } from '~/types/room';
+import { getRoundLabel } from '~/constants/maps';
 
 interface RoomCreationProps {
     maps: string[];
@@ -102,15 +103,6 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
         } else {
             return `${minutes}m remaining`;
         }
-    };
-
-    const getRoundLabel = (roundValue: string) => {
-        const roundOptions = [
-            { value: 'bo1', label: 'Best of 1' },
-            { value: 'bo3', label: 'Best of 3' },
-            { value: 'bo5', label: 'Best of 5' },
-        ];
-        return roundOptions.find(opt => opt.value === roundValue)?.label ?? roundValue;
     };
 
     if (!roomData) {
