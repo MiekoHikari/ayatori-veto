@@ -2,20 +2,21 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { EventEmitter } from "events";
 import { observable } from "@trpc/server/observable";
+import { TRPCError } from "@trpc/server";
+import {
+    roomCreationLimiter,
+    globalRoomCreationLimiter,
+    ipBasedLimiter
+} from "~/lib/rate-limiter";
+import { RoomValidation, SecurityUtils } from "~/lib/room-validation";
 
 // Global event emitter for room updates
 const roomEventEmitter = new EventEmitter();
 
 const createRoomSchema = z.object({
-    masterRoomId: z.string(),
-    teamAId: z.string(),
-    teamBId: z.string(),
-    teamALink: z.string(),
-    teamBLink: z.string(),
-    spectatorLink: z.string(),
-    expiresAt: z.string(),
-    maps: z.array(z.string()),
-    roundType: z.string(),
+    maps: z.array(z.string()).min(3).max(8),
+    roundType: z.enum(['bo1', 'bo3', 'bo5']),
+    clientIp: z.string().optional(),
 });
 
 // Veto action types
@@ -78,24 +79,136 @@ export const roomRouter = createTRPCRouter({
     create: publicProcedure
         .input(createRoomSchema)
         .mutation(async ({ ctx, input }) => {
+            // 1. Validate input data
+            const validation = RoomValidation.validateRoomCreation({
+                maps: input.maps,
+                roundType: input.roundType,
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+            });
+
+            if (!validation.isValid) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: `Validation failed: ${validation.errors.join(', ')}`,
+                });
+            }
+
+            // 2. Get user identifier for rate limiting
+            const userId = ctx.session?.user?.id;
+            const clientIp = input.clientIp ?? 'unknown';
+            const userIdentifier = SecurityUtils.getUserIdentifier(userId, clientIp);
+
+            // 3. Check rate limits
+            const [userLimit, globalLimit, ipLimit] = await Promise.all([
+                roomCreationLimiter.checkLimit(userIdentifier),
+                globalRoomCreationLimiter.checkLimit('global'),
+                ipBasedLimiter.checkLimit(clientIp),
+            ]);
+
+            if (!userLimit.allowed) {
+                throw new TRPCError({
+                    code: 'TOO_MANY_REQUESTS',
+                    message: `Rate limit exceeded. Try again in ${Math.ceil((userLimit.resetTime - Date.now()) / 60000)} minutes.`,
+                });
+            }
+
+            if (!globalLimit.allowed) {
+                throw new TRPCError({
+                    code: 'TOO_MANY_REQUESTS',
+                    message: 'Service is currently busy. Please try again later.',
+                });
+            }
+
+            if (!ipLimit.allowed) {
+                throw new TRPCError({
+                    code: 'TOO_MANY_REQUESTS',
+                    message: `Too many requests from your IP. Try again in ${Math.ceil((ipLimit.resetTime - Date.now()) / 60000)} minutes.`,
+                });
+            }
+
+            // 4. Clean up expired rooms before creating new one
+            await ctx.db.room.deleteMany({
+                where: {
+                    expiresAt: {
+                        lt: new Date(),
+                    },
+                },
+            });
+
+            // 5. Check if user has too many active rooms
+            if (userId) {
+                const userActiveRooms = await ctx.db.room.count({
+                    where: {
+                        createdAt: {
+                            gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+                        },
+                        expiresAt: {
+                            gt: new Date(),
+                        },
+                    },
+                });
+
+                if (userActiveRooms >= 5) { // Max 5 active rooms per user
+                    throw new TRPCError({
+                        code: 'TOO_MANY_REQUESTS',
+                        message: 'You have too many active rooms. Please wait for some to expire or delete them.',
+                    });
+                }
+            }
+
+            // 6. Generate secure room data
+            const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+            const roomLinks = SecurityUtils.generateRoomLinks(baseUrl);
+            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+            // 7. Create the room
             const roomData = {
-                masterRoomId: input.masterRoomId,
-                teamAId: input.teamAId,
-                teamBId: input.teamBId,
-                teamALink: input.teamALink,
-                teamBLink: input.teamBLink,
-                spectatorLink: input.spectatorLink,
-                expiresAt: new Date(input.expiresAt),
+                masterRoomId: roomLinks.masterRoomId,
+                teamAId: roomLinks.teamAId,
+                teamBId: roomLinks.teamBId,
+                teamALink: roomLinks.teamALink,
+                teamBLink: roomLinks.teamBLink,
+                spectatorLink: roomLinks.spectatorLink,
+                expiresAt,
                 maps: input.maps,
                 roundType: input.roundType,
                 teamAReady: false,
                 teamBReady: false,
                 status: "waiting",
+            };
+
+            try {
+                await ctx.db.room.create({ data: roomData });
+
+                // Return the created room data
+                return {
+                    id: roomLinks.masterRoomId,
+                    teamAId: roomLinks.teamAId,
+                    teamBId: roomLinks.teamBId,
+                    teamALink: roomLinks.teamALink,
+                    teamBLink: roomLinks.teamBLink,
+                    spectatorLink: roomLinks.spectatorLink,
+                    createdAt: new Date().toISOString(),
+                    expiresAt: expiresAt.toISOString(),
+                    maps: input.maps,
+                    roundType: input.roundType,
+                    teamAReady: false,
+                    teamBReady: false,
+                    status: "waiting" as const,
+                };
+            } catch (error) {
+                // If database creation fails, we should handle potential race conditions
+                if (error instanceof Error && error.message.includes('unique constraint')) {
+                    throw new TRPCError({
+                        code: 'INTERNAL_SERVER_ERROR',
+                        message: 'Room creation failed due to ID collision. Please try again.',
+                    });
+                }
+                throw new TRPCError({
+                    code: 'INTERNAL_SERVER_ERROR',
+                    message: 'Failed to create room. Please try again.',
+                });
             }
-
-            await ctx.db.room.create({ data: roomData })
-
-            return roomData;
         }),
 
     getByMasterRoomId: publicProcedure

@@ -1,6 +1,7 @@
 "use client";
 import { ArrowLeft } from 'lucide-react';
-import React, { useState, Suspense } from 'react'
+import React, { useState, Suspense, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation';
 import { Button } from '~/components/ui/button';
 import RoomCreation from './_components/room-creation';
 import MapSelection from './_components/map-selection';
@@ -24,11 +25,20 @@ interface RoomData {
 }
 
 function Veto() {
+  const searchParams = useSearchParams();
   const [showVeto, setShowVeto] = useState(false);
   const [roomData, setRoomData] = useState<RoomData | null>(null);
   const [showRoomCreation, setShowRoomCreation] = useState(false);
   const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
-  const [roundType, setRoundType] = useState<string>('');
+  const [roundType, setRoundType] = useState<string>('bo1');
+
+  // Initialize round type from URL parameters
+  useEffect(() => {
+    const roundFromUrl = searchParams.get('round');
+    if (roundFromUrl && ['bo1', 'bo3', 'bo5'].includes(roundFromUrl)) {
+      setRoundType(roundFromUrl);
+    }
+  }, [searchParams]);
 
   const handleBackToSelection = () => {
     setShowVeto(false);

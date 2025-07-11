@@ -43,46 +43,28 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
         setIsCreating(true);
 
         try {
-            // Generate room IDs
-            const masterRoomId = generateRoomId();
-            const teamAId = generateRoomId();
-            const teamBId = generateRoomId();
-            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
-
-            // Create room links with separate IDs for teams
-            const baseUrl = window.location.origin;
-            const teamALink = `${baseUrl}/${teamAId}`;
-            const teamBLink = `${baseUrl}/${teamBId}`;
-            const spectatorLink = `${baseUrl}/${masterRoomId}`;
-
-            // Create room using tRPC
-            await createRoomMutation.mutateAsync({
-                masterRoomId,
-                teamAId,
-                teamBId,
-                teamALink,
-                teamBLink,
-                spectatorLink,
-                expiresAt,
+            // Create room using tRPC with new secure API
+            const result = await createRoomMutation.mutateAsync({
                 maps,
-                roundType,
+                roundType: roundType as 'bo1' | 'bo3' | 'bo5',
+                clientIp: undefined, // Will be determined server-side
             });
 
-            // Transform the mutation result to match RoomData interface
+            // Transform the result to match RoomData interface
             const newRoomData: RoomData = {
-                id: masterRoomId,
-                teamAId,
-                teamBId,
-                teamALink,
-                teamBLink,
-                spectatorLink,
-                createdAt: new Date().toISOString(),
-                expiresAt,
-                maps,
-                roundType,
-                teamAReady: false,
-                teamBReady: false,
-                status: 'waiting' as const,
+                id: result.id,
+                teamAId: result.teamAId,
+                teamBId: result.teamBId,
+                teamALink: result.teamALink,
+                teamBLink: result.teamBLink,
+                spectatorLink: result.spectatorLink,
+                createdAt: result.createdAt,
+                expiresAt: result.expiresAt,
+                maps: result.maps,
+                roundType: result.roundType,
+                teamAReady: result.teamAReady,
+                teamBReady: result.teamBReady,
+                status: result.status,
             };
 
             setRoomData(newRoomData);
@@ -90,18 +72,21 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
 
         } catch (error) {
             console.error('Error creating room:', error);
+            // Handle specific error types
+            if (error instanceof Error) {
+                if (error.message.includes('Rate limit exceeded')) {
+                    alert('You are creating rooms too quickly. Please wait before creating another room.');
+                } else if (error.message.includes('Too many requests')) {
+                    alert('Too many rooms are being created. Please try again later.');
+                } else if (error.message.includes('Validation failed')) {
+                    alert(`Invalid room configuration: ${error.message}`);
+                } else {
+                    alert('Failed to create room. Please try again.');
+                }
+            }
         } finally {
             setIsCreating(false);
         }
-    };
-
-    const generateRoomId = (): string => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
-        for (let i = 0; i < 6; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
     };
 
     const copyToClipboard = async (text: string, _label: string) => {
