@@ -153,15 +153,15 @@ export default function VetoProcess({
         const mapData = MAP_DATA[mapId];
 
         if (action === 'pick' && mapData?.isDemolition) {
-            // Check if this is the final map pick
-            const isFinalMap = vetoState &&
+            // Check if this is the final pick in the sequence
+            const isFinalPick = vetoState &&
                 (vetoState.currentStep + 1) >= vetoState.vetoSequence.length;
 
-            if (isFinalMap && teamRole === 'team-a') {
-                // Team A picks the final map and selects the side
+            if (isFinalPick) {
+                // For the final pick, the picking team selects the side
                 setPendingMapId(mapId);
                 setShowSideSelection(true);
-            } else if (!isFinalMap) {
+            } else {
                 // For non-final demolition maps, pick without side selection
                 // The opposing team will choose the side
                 try {
@@ -170,17 +170,6 @@ export default function VetoProcess({
                         action,
                         mapId,
                         // No side selection for non-final demolition maps
-                    });
-                } catch (error) {
-                    console.error('Failed to make veto action:', error);
-                }
-            } else {
-                // Team B picking final map (shouldn't happen in normal flow)
-                try {
-                    await makeVetoActionMutation.mutateAsync({
-                        teamId: roomId,
-                        action,
-                        mapId,
                     });
                 } catch (error) {
                     console.error('Failed to make veto action:', error);

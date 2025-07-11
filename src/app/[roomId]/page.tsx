@@ -10,7 +10,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Eye, Crown, Clock, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { api } from '~/trpc/react';
-import VetoProcess from '../../_components/veto-process';
+import VetoProcess from '../_components/veto-process';
 
 const MAP_DATA: Record<string, { name: string; image: string; isDemolition: boolean }> = {
     'area88': { name: 'Area 88', image: '/maps/Area88.png', isDemolition: true },

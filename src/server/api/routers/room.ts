@@ -244,39 +244,103 @@ export const roomRouter = createTRPCRouter({
                             completed: false,
                         });
                     } else if (roundType === 'bo3') {
-                        // Bo3: Each team bans 1 map, then each team picks 1 map, then each team bans 1 map, final map is played
-                        // Assuming 7 maps: Ban, Ban, Pick, Pick, Ban, Ban, (1 map left)
+                        // Bo3: Need 3 maps total
+                        // Dynamic sequence based on map count
+                        if (mapCount < 3) {
+                            throw new Error("Bo3 requires at least 3 maps");
+                        }
 
-                        // First ban phase - each team bans 1 map
-                        sequence.push({ team: 'team-a', action: 'ban', completed: false });
-                        sequence.push({ team: 'team-b', action: 'ban', completed: false });
+                        const mapsNeeded = 3;
+                        const bansNeeded = mapCount - mapsNeeded;
 
-                        // Pick phase - each team picks 1 map
-                        sequence.push({ team: 'team-a', action: 'pick', completed: false });
-                        sequence.push({ team: 'team-b', action: 'pick', completed: false });
-
-                        // Second ban phase - each team bans 1 map
-                        sequence.push({ team: 'team-a', action: 'ban', completed: false });
-                        sequence.push({ team: 'team-b', action: 'ban', completed: false });
-
-                        // Final map is picked by Team A (but opponent chooses side)
-                        sequence.push({ team: 'team-a', action: 'pick', completed: false });
-
+                        if (bansNeeded === 0) {
+                            // Exactly 3 maps: Team A picks first, Team B picks second, Team A picks third
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-b', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                        } else if (bansNeeded === 1) {
+                            // 4 maps: Ban 1, then pick 3
+                            sequence.push({ team: 'team-a', action: 'ban', completed: false });
+                            sequence.push({ team: 'team-b', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-b', action: 'pick', completed: false });
+                        } else if (bansNeeded === 2) {
+                            // 5 maps: Ban 2, then pick 3
+                            sequence.push({ team: 'team-a', action: 'ban', completed: false });
+                            sequence.push({ team: 'team-b', action: 'ban', completed: false });
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-b', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                        } else {
+                            // More maps: Alternate bans until 3 maps left, then pick all 3
+                            for (let i = 0; i < bansNeeded; i++) {
+                                sequence.push({
+                                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                    action: 'ban',
+                                    completed: false,
+                                });
+                            }
+                            // Pick the remaining 3 maps
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-b', action: 'pick', completed: false });
+                            sequence.push({ team: 'team-a', action: 'pick', completed: false });
+                        }
                     } else if (roundType === 'bo5') {
-                        // Bo5: Each team bans 1 map, then they pick maps and sides in turns
-                        // Assuming 7 maps: Ban, Ban, Pick, Pick, Pick, Pick, Pick
+                        // Bo5: Need 5 maps total
+                        if (mapCount < 5) {
+                            throw new Error("Bo5 requires at least 5 maps");
+                        }
 
-                        // Initial ban phase - each team bans 1 map
-                        sequence.push({ team: 'team-a', action: 'ban', completed: false });
-                        sequence.push({ team: 'team-b', action: 'ban', completed: false });
+                        const mapsNeeded = 5;
+                        const bansNeeded = mapCount - mapsNeeded;
 
-                        // Pick phase - teams alternate picking maps (5 maps total)
-                        for (let i = 0; i < 5; i++) {
-                            sequence.push({
-                                team: i % 2 === 0 ? 'team-a' : 'team-b',
-                                action: 'pick',
-                                completed: false,
-                            });
+                        if (bansNeeded === 0) {
+                            // Exactly 5 maps: Pick all 5 alternating
+                            for (let i = 0; i < 5; i++) {
+                                sequence.push({
+                                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                    action: 'pick',
+                                    completed: false,
+                                });
+                            }
+                        } else if (bansNeeded === 1) {
+                            // 6 maps: Ban 1, then pick 5
+                            sequence.push({ team: 'team-a', action: 'ban', completed: false });
+                            for (let i = 0; i < 5; i++) {
+                                sequence.push({
+                                    team: i % 2 === 0 ? 'team-b' : 'team-a',
+                                    action: 'pick',
+                                    completed: false,
+                                });
+                            }
+                        } else if (bansNeeded === 2) {
+                            // 7 maps: Ban 2, then pick 5
+                            sequence.push({ team: 'team-a', action: 'ban', completed: false });
+                            sequence.push({ team: 'team-b', action: 'ban', completed: false });
+                            for (let i = 0; i < 5; i++) {
+                                sequence.push({
+                                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                    action: 'pick',
+                                    completed: false,
+                                });
+                            }
+                        } else {
+                            // More maps: Alternate bans until 5 maps left, then pick all 5
+                            for (let i = 0; i < bansNeeded; i++) {
+                                sequence.push({
+                                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                    action: 'ban',
+                                    completed: false,
+                                });
+                            }
+                            // Pick the remaining 5 maps
+                            for (let i = 0; i < 5; i++) {
+                                sequence.push({
+                                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                                    action: 'pick',
+                                    completed: false,
+                                });
+                            }
                         }
                     }
 
@@ -569,19 +633,16 @@ export const roomRouter = createTRPCRouter({
             // For demolition maps, determine who should choose the side
             const isDemolitionMap = true; // All maps are demolition maps in this game
             const isLastMapInSequence = (currentStep + 1) >= vetoState.vetoSequence.length;
+            const isLastPickAction = input.action === 'pick' && isLastMapInSequence;
 
-            // For the final map, Team A picks the side for fairness
-            // For other demolition maps, the opposing team chooses the side
-            if (input.action === 'pick' && isDemolitionMap && isLastMapInSequence) {
-                // Team A should provide side selection for final map
-                if (teamRole === 'team-a' && !input.side) {
-                    throw new Error("Team A must select a side for the final map");
+            // For the last pick in the sequence, the picking team selects the side
+            // For other picks, the opposing team chooses the side for fairness
+            if (input.action === 'pick' && isDemolitionMap && isLastPickAction) {
+                // Last pick: The team making the pick should provide side selection
+                if (!input.side) {
+                    throw new Error("Side selection is required for the final map pick");
                 }
-                // Team B cannot select side for final map
-                if (teamRole === 'team-b' && input.side) {
-                    throw new Error("Only Team A can select side for the final map");
-                }
-            } else if (input.action === 'pick' && isDemolitionMap && !isLastMapInSequence) {
+            } else if (input.action === 'pick' && isDemolitionMap && !isLastPickAction) {
                 // For other demolition maps, opposing team chooses side
                 if (input.side) {
                     throw new Error("Side selection should be done by the opposing team for fairness");
@@ -614,7 +675,7 @@ export const roomRouter = createTRPCRouter({
                     ? [...vetoState.pickedMaps, {
                         mapId: input.mapId,
                         pickedBy: teamRole,
-                        side: (isDemolitionMap && isLastMapInSequence && teamRole === 'team-a') ? input.side : undefined,
+                        side: (isDemolitionMap && isLastPickAction) ? input.side : undefined,
                     }]
                     : vetoState.pickedMaps,
                 vetoSequence: vetoState.vetoSequence.map((step, index) =>
@@ -627,13 +688,13 @@ export const roomRouter = createTRPCRouter({
             let vetoCompleted = newVetoState.currentStep >= newVetoState.vetoSequence.length;
             let nextTurn: string | null = null;
 
-            if (input.action === 'pick' && isDemolitionMap && !isLastMapInSequence) {
+            if (input.action === 'pick' && isDemolitionMap && !isLastPickAction) {
                 // For non-final demolition maps, the opposing team chooses the side
                 const opposingTeam = teamRole === 'team-a' ? 'team-b' : 'team-a';
                 vetoCompleted = false;
                 nextTurn = opposingTeam;
-            } else if (input.action === 'pick' && isDemolitionMap && isLastMapInSequence && teamRole === 'team-a') {
-                // Final map picked by Team A with side selection - veto is complete
+            } else if (input.action === 'pick' && isDemolitionMap && isLastPickAction) {
+                // Final map picked with side selection - veto is complete
                 vetoCompleted = true;
                 nextTurn = null;
             } else if (vetoCompleted) {

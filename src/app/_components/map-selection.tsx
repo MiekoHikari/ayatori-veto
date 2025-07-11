@@ -39,10 +39,10 @@ const ROUND_OPTIONS = [
 ];
 
 interface MapSelectionProps {
-    onMapsSelected: (maps: string[], roundType: string) => void;
+    onMapsSelectedAction: (maps: string[], roundType: string) => void;
 }
 
-export default function MapSelection({ onMapsSelected }: MapSelectionProps) {
+export default function MapSelection({ onMapsSelectedAction: onMapsSelected }: MapSelectionProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
