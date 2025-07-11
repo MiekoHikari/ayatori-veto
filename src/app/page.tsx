@@ -5,24 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '~/components/ui/button';
 import RoomCreation from './_components/room-creation';
 import MapSelection from './_components/map-selection';
-
-interface RoomData {
-  id: string;
-  teamAId: string;
-  teamBId: string;
-  teamALink: string;
-  teamBLink: string;
-  spectatorLink: string;
-  createdAt: string;
-  expiresAt: string;
-  maps: string[];
-  roundType: string;
-  teamAReady: boolean;
-  teamBReady: boolean;
-  teamAName?: string;
-  teamBName?: string;
-  status: 'waiting' | 'active' | 'completed' | 'expired';
-}
+import { type RoomData } from '~/types/room';
 
 function VetoContent() {
   const searchParams = useSearchParams();

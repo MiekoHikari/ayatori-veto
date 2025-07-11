@@ -11,6 +11,7 @@ import { Label } from '~/components/ui/label';
 import { Eye, Crown, Clock, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { api } from '~/trpc/react';
 import VetoProcess from '../_components/veto-process';
+import { type RoomData } from '~/types/room';
 
 const MAP_DATA: Record<string, { name: string; image: string; isDemolition: boolean }> = {
     'area88': { name: 'Area 88', image: '/maps/Area88.png', isDemolition: true },
@@ -22,30 +23,6 @@ const MAP_DATA: Record<string, { name: string; image: string; isDemolition: bool
     'cosmite': { name: 'Cosmite', image: '/maps/Cosmite.png', isDemolition: true },
     'ocarnus': { name: 'Ocarnus', image: '/maps/Ocarnus.png', isDemolition: true },
 };
-
-interface RoomData {
-    id: string;
-    teamAId: string;
-    teamBId: string;
-    teamALink: string;
-    teamBLink: string;
-    spectatorLink: string;
-    createdAt: string;
-    expiresAt: string;
-    maps: string[];
-    roundType: string;
-    teamAReady: boolean;
-    teamBReady: boolean;
-    teamAName: string | null;
-    teamBName: string | null;
-    status: 'waiting' | 'active' | 'completed' | 'expired';
-    masterRoomId?: string;
-    teamRole?: 'team-a' | 'team-b';
-    vetoStarted?: boolean;
-    vetoCompleted?: boolean;
-    currentTurn?: string | null;
-    vetoState?: unknown;
-}
 
 export default function RoomPage() {
     const params = useParams();
@@ -451,8 +428,8 @@ export default function RoomPage() {
                                     roomId={roomId}
                                     teamRole={roomData.teamRole}
                                     isSpectator={isSpectator}
-                                    teamAName={roomData.teamAName}
-                                    teamBName={roomData.teamBName}
+                                    teamAName={roomData.teamAName ?? null}
+                                    teamBName={roomData.teamBName ?? null}
                                     roundType={roomData.roundType}
                                 />
                             </div>

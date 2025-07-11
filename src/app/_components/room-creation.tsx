@@ -8,24 +8,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Copy, Users, Eye, Crown, Clock } from 'lucide-react';
 import { api } from '~/trpc/react';
-
-interface RoomData {
-    id: string;
-    teamAId: string;
-    teamBId: string;
-    teamALink: string;
-    teamBLink: string;
-    spectatorLink: string;
-    createdAt: string;
-    expiresAt: string;
-    maps: string[];
-    roundType: string;
-    teamAReady: boolean;
-    teamBReady: boolean;
-    teamAName?: string;
-    teamBName?: string;
-    status: 'waiting' | 'active' | 'completed' | 'expired';
-}
+import { type RoomData } from '~/types/room';
 
 interface RoomCreationProps {
     maps: string[];
