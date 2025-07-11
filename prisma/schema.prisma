@@ -87,6 +87,8 @@ model Room {
     roundType      String   // 'bo1', 'bo3', 'bo5'
     teamAReady     Boolean  @default(false)
     teamBReady     Boolean  @default(false)
+    teamAName      String?  // Team A's chosen name
+    teamBName      String?  // Team B's chosen name
     status         String   @default("waiting") // 'waiting', 'active', 'completed', 'expired'
     
     @@index([masterRoomId])

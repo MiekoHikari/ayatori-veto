@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/badge';
-import { Eye, Crown, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Input } from '~/components/ui/input';
+import { Label } from '~/components/ui/label';
+import { Eye, Crown, Clock, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { api } from '~/trpc/react';
 
 interface RoomData {
@@ -21,6 +23,8 @@ interface RoomData {
     roundType: string;
     teamAReady: boolean;
     teamBReady: boolean;
+    teamAName: string | null;
+    teamBName: string | null;
     status: 'waiting' | 'active' | 'completed' | 'expired';
     masterRoomId?: string;
     teamRole?: 'team-a' | 'team-b';
@@ -32,6 +36,8 @@ export default function RoomPage() {
     const [roomData, setRoomData] = useState<RoomData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [teamName, setTeamName] = useState('');
+    const [isEditingName, setIsEditingName] = useState(false);
 
     // Try to get room by master room ID first
     const masterRoomQuery = api.room.getByMasterRoomId.useQuery(
@@ -46,6 +52,7 @@ export default function RoomPage() {
     );
 
     const updateTeamReadyMutation = api.room.updateTeamReady.useMutation();
+    const updateTeamNameMutation = api.room.updateTeamName.useMutation();
 
     useEffect(() => {
         if (masterRoomQuery.data) {
@@ -53,6 +60,10 @@ export default function RoomPage() {
             setIsLoading(false);
         } else if (teamRoomQuery.data) {
             setRoomData(teamRoomQuery.data);
+            const currentTeamName = teamRoomQuery.data.teamRole === 'team-a'
+                ? teamRoomQuery.data.teamAName
+                : teamRoomQuery.data.teamBName;
+            setTeamName(currentTeamName ?? '');
             setIsLoading(false);
         } else if (masterRoomQuery.isError && teamRoomQuery.isError) {
             setError('Room not found');
@@ -72,6 +83,31 @@ export default function RoomPage() {
         } catch (error) {
             console.error('Error updating team ready status:', error);
         }
+    };
+
+    const handleTeamNameSave = async () => {
+        if (!roomData?.teamRole || teamName.trim() === '') return;
+
+        try {
+            const updatedRoom = await updateTeamNameMutation.mutateAsync({
+                teamId: roomId,
+                teamName: teamName.trim(),
+            });
+            setRoomData(updatedRoom);
+            setIsEditingName(false);
+        } catch (error) {
+            console.error('Error updating team name:', error);
+        }
+    };
+
+    const getCurrentTeamName = () => {
+        if (!roomData?.teamRole) return '';
+        return roomData.teamRole === 'team-a' ? (roomData.teamAName ?? '') : (roomData.teamBName ?? '');
+    };
+
+    const isCurrentTeamReady = () => {
+        if (!roomData?.teamRole) return false;
+        return roomData.teamRole === 'team-a' ? roomData.teamAReady : roomData.teamBReady;
     };
 
     const getTimeRemaining = (expiresAt: string): string => {
@@ -176,7 +212,7 @@ export default function RoomPage() {
                             <div className="bg-muted/50 rounded-lg p-4">
                                 <h3 className="font-semibold mb-2 flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                    Team A
+                                    {roomData.teamAName ?? 'Team A'}
                                 </h3>
                                 <div className="flex items-center gap-2">
                                     {roomData.teamAReady ? (
@@ -192,7 +228,7 @@ export default function RoomPage() {
                             <div className="bg-muted/50 rounded-lg p-4">
                                 <h3 className="font-semibold mb-2 flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                    Team B
+                                    {roomData.teamBName ?? 'Team B'}
                                 </h3>
                                 <div className="flex items-center gap-2">
                                     {roomData.teamBReady ? (
@@ -207,6 +243,73 @@ export default function RoomPage() {
                             </div>
                         </div>
 
+                        {/* Team Name Setting */}
+                        {!isSpectator && (
+                            <div className="border-t pt-4">
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="team-name" className="text-sm font-medium">
+                                            {isTeamA ? 'Team A' : 'Team B'} Name
+                                        </Label>
+                                        <div className="flex gap-2 mt-1">
+                                            {isEditingName ? (
+                                                <>
+                                                    <Input
+                                                        id="team-name"
+                                                        value={teamName}
+                                                        onChange={(e) => setTeamName(e.target.value)}
+                                                        placeholder="Enter team name"
+                                                        maxLength={50}
+                                                        disabled={isCurrentTeamReady()}
+                                                    />
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={handleTeamNameSave}
+                                                        disabled={teamName.trim() === '' || updateTeamNameMutation.isPending}
+                                                    >
+                                                        {updateTeamNameMutation.isPending ? 'Saving...' : 'Save'}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            setIsEditingName(false);
+                                                            setTeamName(getCurrentTeamName());
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Input
+                                                        value={getCurrentTeamName() || 'No team name set'}
+                                                        readOnly
+                                                        className="bg-muted"
+                                                    />
+                                                    {!isCurrentTeamReady() && (
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setIsEditingName(true);
+                                                                setTeamName(getCurrentTeamName());
+                                                            }}
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                        {!getCurrentTeamName() && (
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                You must set a team name before marking ready.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Team Actions */}
                         {!isSpectator && (
                             <div className="border-t pt-4">
@@ -218,7 +321,7 @@ export default function RoomPage() {
                                         <Button
                                             variant={isTeamA ? (roomData.teamAReady ? 'default' : 'outline') : (roomData.teamBReady ? 'default' : 'outline')}
                                             onClick={() => handleTeamReady(!(isTeamA ? roomData.teamAReady : roomData.teamBReady))}
-                                            disabled={updateTeamReadyMutation.isPending}
+                                            disabled={updateTeamReadyMutation.isPending || (!getCurrentTeamName() && !(isTeamA ? roomData.teamAReady : roomData.teamBReady))}
                                         >
                                             {updateTeamReadyMutation.isPending ? 'Updating...' :
                                                 (isTeamA ? roomData.teamAReady : roomData.teamBReady) ? 'Mark Not Ready' : 'Mark Ready'
@@ -226,6 +329,11 @@ export default function RoomPage() {
                                         </Button>
                                     </div>
                                 </div>
+                                {!getCurrentTeamName() && !(isTeamA ? roomData.teamAReady : roomData.teamBReady) && (
+                                    <p className="text-sm text-muted-foreground mt-2">
+                                        Set a team name before marking ready.
+                                    </p>
+                                )}
                             </div>
                         )}
 

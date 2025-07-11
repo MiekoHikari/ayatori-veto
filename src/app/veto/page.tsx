@@ -18,6 +18,8 @@ interface RoomData {
     roundType: string;
     teamAReady: boolean;
     teamBReady: boolean;
+    teamAName?: string;
+    teamBName?: string;
     status: 'waiting' | 'active' | 'completed' | 'expired';
 }
 
@@ -82,7 +84,7 @@ function Veto() {
                 <RoomCreation
                     maps={selectedMaps}
                     roundType={roundType}
-                    onRoomCreated={handleRoomCreated}
+                    onRoomCreatedAction={handleRoomCreated}
                 />
             </div>
         );
@@ -109,7 +111,7 @@ function Veto() {
                 <RoomCreation
                     maps={selectedMaps}
                     roundType={roundType}
-                    onRoomCreated={handleRoomCreated}
+                    onRoomCreatedAction={handleRoomCreated}
                 />
             </div>
         );

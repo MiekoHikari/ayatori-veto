@@ -22,16 +22,18 @@ interface RoomData {
     roundType: string;
     teamAReady: boolean;
     teamBReady: boolean;
+    teamAName?: string;
+    teamBName?: string;
     status: 'waiting' | 'active' | 'completed' | 'expired';
 }
 
 interface RoomCreationProps {
     maps: string[];
     roundType: string;
-    onRoomCreated: (roomData: RoomData) => void;
+    onRoomCreatedAction: (roomData: RoomData) => void;
 }
 
-export default function RoomCreation({ maps, roundType, onRoomCreated }: RoomCreationProps) {
+export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onRoomCreated }: RoomCreationProps) {
     const [isCreating, setIsCreating] = useState(false);
     const [roomData, setRoomData] = useState<RoomData | null>(null);
 
@@ -54,7 +56,7 @@ export default function RoomCreation({ maps, roundType, onRoomCreated }: RoomCre
             const spectatorLink = `${baseUrl}/veto/room/${masterRoomId}`;
 
             // Create room using tRPC
-            const newRoomData = await createRoomMutation.mutateAsync({
+            await createRoomMutation.mutateAsync({
                 masterRoomId,
                 teamAId,
                 teamBId,
@@ -65,6 +67,23 @@ export default function RoomCreation({ maps, roundType, onRoomCreated }: RoomCre
                 maps,
                 roundType,
             });
+
+            // Transform the mutation result to match RoomData interface
+            const newRoomData: RoomData = {
+                id: masterRoomId,
+                teamAId,
+                teamBId,
+                teamALink,
+                teamBLink,
+                spectatorLink,
+                createdAt: new Date().toISOString(),
+                expiresAt,
+                maps,
+                roundType,
+                teamAReady: false,
+                teamBReady: false,
+                status: 'waiting' as const,
+            };
 
             setRoomData(newRoomData);
             onRoomCreated(newRoomData);
