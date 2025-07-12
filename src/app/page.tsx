@@ -14,6 +14,7 @@ function VetoContent() {
   const [showRoomCreation, setShowRoomCreation] = useState(false);
   const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
   const [roundType, setRoundType] = useState<string>('bo1');
+  const [vetoSequence, setVetoSequence] = useState<Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>>();
 
   // Initialize round type from URL parameters
   useEffect(() => {
@@ -34,9 +35,10 @@ function VetoContent() {
     setShowVeto(true);
   };
 
-  const handleMapsSelected = (maps: string[], round: string) => {
+  const handleMapsSelected = (maps: string[], round: string, customVetoSequence?: Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>) => {
     setSelectedMaps(maps);
     setRoundType(round);
+    setVetoSequence(customVetoSequence);
     setShowRoomCreation(true);
   };
 
@@ -75,6 +77,7 @@ function VetoContent() {
         <RoomCreation
           maps={selectedMaps}
           roundType={roundType}
+          vetoSequence={vetoSequence}
           onRoomCreatedAction={handleRoomCreated}
         />
       </div>
@@ -102,6 +105,7 @@ function VetoContent() {
         <RoomCreation
           maps={selectedMaps}
           roundType={roundType}
+          vetoSequence={vetoSequence}
           onRoomCreatedAction={handleRoomCreated}
         />
       </div>

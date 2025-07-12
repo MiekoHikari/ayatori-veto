@@ -15,10 +15,11 @@ import { copyToClipboard } from '~/lib/utils';
 interface RoomCreationProps {
     maps: string[];
     roundType: string;
+    vetoSequence?: Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>;
     onRoomCreatedAction: (roomData: RoomData) => void;
 }
 
-export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onRoomCreated }: RoomCreationProps) {
+export default function RoomCreation({ maps, roundType, vetoSequence, onRoomCreatedAction: onRoomCreated }: RoomCreationProps) {
     const [isCreating, setIsCreating] = useState(false);
     const [roomData, setRoomData] = useState<RoomData | null>(null);
 
@@ -33,6 +34,7 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
                 maps,
                 roundType: roundType as 'bo1' | 'bo3' | 'bo5',
                 clientIp: undefined, // Will be determined server-side
+                customVetoSequence: vetoSequence,
             });
 
             // Transform the result to match RoomData interface
@@ -119,7 +121,33 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
                                         <span className="text-muted-foreground">Room Duration:</span>
                                         <span className="font-medium">24 hours</span>
                                     </div>
+                                    {vetoSequence && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Veto Format:</span>
+                                            <span className="font-medium">Custom</span>
+                                        </div>
+                                    )}
                                 </div>
+                                {vetoSequence && (
+                                    <div className="mt-3">
+                                        <h4 className="text-xs font-medium text-muted-foreground mb-2">Veto Sequence:</h4>
+                                        <div className="flex flex-wrap gap-1">
+                                            {vetoSequence.map((step, index) => (
+                                                <Badge
+                                                    key={index}
+                                                    variant={
+                                                        step.action === 'ban' ? 'destructive' :
+                                                            step.action === 'pick' ? 'default' :
+                                                                'secondary'
+                                                    }
+                                                    className="text-xs"
+                                                >
+                                                    {step.team === 'team-a' ? 'A' : 'B'}-{step.action === 'side' ? 'SIDE' : step.action.toUpperCase()}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div className="bg-muted/50 rounded-lg p-4">
                                 <h3 className="font-semibold mb-2">Room Features</h3>

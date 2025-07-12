@@ -1,6 +1,6 @@
 import { Card, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
-import { Clock, Ban, Target } from 'lucide-react';
+import { Clock, Ban, Target, Shield } from 'lucide-react';
 import { getTeamDisplayName } from '~/lib/veto-utils';
 import type { VetoState, TeamType } from '~/types/veto';
 
@@ -35,14 +35,21 @@ export const CurrentTurnIndicator = ({
                                 <span className={`font-bold ${currentSequenceItem.team === teamRole ? 'text-primary' : ''}`}>
                                     {getTeamDisplayName(currentSequenceItem.team, teamAName, teamBName)}
                                 </span>&apos;s turn to{' '}
-                                <strong className={currentSequenceItem.action === 'ban' ? 'text-red-500' : 'text-green-500'}>
-                                    {currentSequenceItem.action}
-                                </strong> a map
+                                <strong className={
+                                    currentSequenceItem.action === 'ban' ? 'text-red-500' :
+                                        currentSequenceItem.action === 'pick' ? 'text-green-500' :
+                                            'text-blue-500'
+                                }>
+                                    {currentSequenceItem.action === 'side' ? 'choose side for' : currentSequenceItem.action}
+                                </strong>{' '}
+                                {currentSequenceItem.action === 'side' ? 'the map' : 'a map'}
                             </span>
                             {currentSequenceItem.action === 'ban' ? (
                                 <Ban className="w-4 h-4 text-red-500" />
-                            ) : (
+                            ) : currentSequenceItem.action === 'pick' ? (
                                 <Target className="w-4 h-4 text-green-500" />
+                            ) : (
+                                <Shield className="w-4 h-4 text-blue-500" />
                             )}
                         </div>
                     )}

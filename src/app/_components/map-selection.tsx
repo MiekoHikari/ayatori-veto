@@ -9,11 +9,13 @@ import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
 import { ALL_MAPS, ROUND_OPTIONS, getAllCategories, getRoundOption, filterMapsByCategory, validateMapIds, isValidRoundType } from '~/constants/maps';
+import { VetoPresetSelector } from './veto/veto-preset-selector';
+import { VetoOrderBuilder } from './veto/veto-order-builder';
 
 const CATEGORIES = getAllCategories();
 
 interface MapSelectionProps {
-    onMapsSelectedAction: (maps: string[], roundType: string) => void;
+    onMapsSelectedAction: (maps: string[], roundType: string, vetoSequence?: Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>) => void;
 }
 
 function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelectionProps) {
@@ -22,6 +24,9 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
     const [selectedMaps, setSelectedMaps] = useState<string[]>([]);
     const [categoryFilter, setCategoryFilter] = useState<string>('All');
     const [roundType, setRoundType] = useState<string>('bo1');
+    const [showVetoCustomization, setShowVetoCustomization] = useState(false);
+    const [selectedPresetId, setSelectedPresetId] = useState<string>();
+    const [customVetoSequence, setCustomVetoSequence] = useState<Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>>();
 
     // Initialize selected maps and round type from URL params
     useEffect(() => {
@@ -85,7 +90,21 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
     };
 
     const handleConfirm = () => {
-        onMapsSelected(selectedMaps, roundType);
+        onMapsSelected(selectedMaps, roundType, customVetoSequence);
+    };
+
+    const handlePresetSelectAction = (presetId: string | null, sequence: Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>) => {
+        setSelectedPresetId(presetId ?? undefined);
+        setCustomVetoSequence(sequence);
+        setShowVetoCustomization(false);
+    };
+
+    const handleCustomizeAction = () => {
+        setShowVetoCustomization(true);
+    };
+
+    const handleVetoSequenceChangeAction = (sequence: Array<{ team: 'team-a' | 'team-b'; action: 'ban' | 'pick' | 'side' }>) => {
+        setCustomVetoSequence(sequence);
     };
 
     return (
@@ -232,11 +251,46 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
                     </div>
                 )}
 
-                <div className="flex justify-end gap-2">
-                    <div className="flex flex-col items-end gap-2">
+                {/* Veto Order Configuration */}
+                {selectedMaps.length > 0 && (
+                    <div className="mt-8 space-y-4">
+                        {!showVetoCustomization ? (
+                            <VetoPresetSelector
+                                roundType={roundType as 'bo1' | 'bo3' | 'bo5'}
+                                mapCount={selectedMaps.length}
+                                selectedPresetId={selectedPresetId}
+                                onPresetSelectAction={handlePresetSelectAction}
+                                onCustomizeAction={handleCustomizeAction}
+                            />
+                        ) : (
+                            <VetoOrderBuilder
+                                roundType={roundType as 'bo1' | 'bo3' | 'bo5'}
+                                mapCount={selectedMaps.length}
+                                initialSequence={customVetoSequence}
+                                onSequenceChangeAction={handleVetoSequenceChangeAction}
+                            />
+                        )}
+                    </div>
+                )}
+
+                <div className="flex justify-between gap-2 mt-6">
+                    {showVetoCustomization && (
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowVetoCustomization(false)}
+                        >
+                            Back to Presets
+                        </Button>
+                    )}
+                    <div className="flex flex-col items-end gap-2 ml-auto">
                         {selectedMaps.length > 0 && (
                             <p className="text-sm text-muted-foreground">
                                 Selected: {selectedMaps.length} maps for {getRoundOption(roundType)?.label}
+                                {customVetoSequence && (
+                                    <span className="text-green-600 ml-2">
+                                        • Veto order configured
+                                    </span>
+                                )}
                             </p>
                         )}
                         <Button
@@ -244,7 +298,7 @@ function MapSelectionContent({ onMapsSelectedAction: onMapsSelected }: MapSelect
                             disabled={selectedMaps.length === 0}
                             className="min-w-24"
                         >
-                            Continue with {getRoundOption(roundType)?.label}
+                            Create Room
                         </Button>
                     </div>
                 </div>

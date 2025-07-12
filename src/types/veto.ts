@@ -1,6 +1,6 @@
 export interface VetoAction {
-    type: 'ban' | 'pick';
-    mapId: string;
+    type: 'ban' | 'pick' | 'side';
+    mapId?: string; // Optional for side actions, which may not be associated with a specific map initially
     side?: 'attack' | 'defense';
     team: 'team-a' | 'team-b';
     timestamp: string;
@@ -19,7 +19,7 @@ export interface VetoState {
     bannedMaps: string[];
     vetoSequence: Array<{
         team: 'team-a' | 'team-b';
-        action: 'ban' | 'pick';
+        action: 'ban' | 'pick' | 'side';
         completed: boolean;
     }>;
     currentStep: number;
@@ -36,5 +36,5 @@ export interface VetoProcessProps {
 }
 
 export type TeamType = 'team-a' | 'team-b';
-export type ActionType = 'ban' | 'pick';
+export type ActionType = 'ban' | 'pick' | 'side';
 export type SideType = 'attack' | 'defense';

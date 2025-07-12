@@ -32,13 +32,17 @@ const createRoomSchema = z.object({
     maps: z.array(z.string()).min(3).max(8),
     roundType: z.enum(['bo1', 'bo3', 'bo5']),
     clientIp: z.string().optional(),
+    customVetoSequence: z.array(z.object({
+        team: z.enum(['team-a', 'team-b']),
+        action: z.enum(['ban', 'pick', 'side']),
+    })).optional(),
 });
 
 // Veto action types
 const VetoActionSchema = z.object({
-    type: z.enum(['ban', 'pick']),
-    mapId: z.string(),
-    side: z.enum(['attack', 'defense']).optional(), // Only for picks on Ranked/Demolition maps
+    type: z.enum(['ban', 'pick', 'side']),
+    mapId: z.string().optional(), // Optional for side actions when they're not associated with a specific map initially
+    side: z.enum(['attack', 'defense']).optional(), // Only for picks on Ranked/Demolition maps and side actions
     team: z.enum(['team-a', 'team-b']),
     timestamp: z.string(),
 });
@@ -58,7 +62,7 @@ const VetoStateSchema = z.object({
     bannedMaps: z.array(z.string()),
     vetoSequence: z.array(z.object({
         team: z.enum(['team-a', 'team-b']),
-        action: z.enum(['ban', 'pick']),
+        action: z.enum(['ban', 'pick', 'side']),
         completed: z.boolean(),
     })),
     currentStep: z.number(),
@@ -752,8 +756,8 @@ export const roomRouter = createTRPCRouter({
     makeVetoAction: publicProcedure
         .input(z.object({
             teamId: z.string(),
-            action: z.enum(['ban', 'pick']),
-            mapId: z.string(),
+            action: z.enum(['ban', 'pick', 'side']),
+            mapId: z.string().optional(), // Optional for side actions
             side: z.enum(['attack', 'defense']).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
@@ -792,9 +796,32 @@ export const roomRouter = createTRPCRouter({
                 throw new Error(`Expected ${currentSequenceItem?.action} action, got ${input.action}`);
             }
 
-            // Validate map is available
-            if (!vetoState.availableMaps.includes(input.mapId)) {
-                throw new Error("Map is not available for selection");
+            // Handle different action types
+            if (input.action === 'side') {
+                // Side selection action - requires a side choice and mapId (for the map to assign side to)
+                if (!input.side) {
+                    throw new Error("Side selection is required for side action");
+                }
+                if (!input.mapId) {
+                    throw new Error("Map ID is required for side action");
+                }
+
+                // Find the picked map that needs side assignment
+                const pickedMapIndex = vetoState.pickedMaps.findIndex(
+                    map => map.mapId === input.mapId && !map.side
+                );
+
+                if (pickedMapIndex === -1) {
+                    throw new Error("No picked map found that needs side assignment");
+                }
+            } else {
+                // Ban or pick actions - validate map is available
+                if (!input.mapId) {
+                    throw new Error("Map ID is required for ban/pick actions");
+                }
+                if (!vetoState.availableMaps.includes(input.mapId)) {
+                    throw new Error("Map is not available for selection");
+                }
             }
 
             // For demolition maps, determine who should choose the side
@@ -841,66 +868,115 @@ export const roomRouter = createTRPCRouter({
                 timestamp: new Date().toISOString(),
             };
 
-            // Update veto state
-            const newVetoState: VetoState = {
-                ...vetoState,
-                actions: [...vetoState.actions, newAction],
-                availableMaps: vetoState.availableMaps.filter((m) => m !== input.mapId),
-                bannedMaps: input.action === 'ban'
-                    ? [...vetoState.bannedMaps, input.mapId]
-                    : vetoState.bannedMaps,
-                pickedMaps: input.action === 'pick'
-                    ? (() => {
-                        const pickedMapSide = (isDemolitionMap && isLastPickAction && room.roundType !== 'bo5') ? input.side : undefined;
+            // Update veto state based on action type
+            let newVetoState: VetoState;
 
-                        const pickedMap: {
-                            mapId: string;
-                            pickedBy: 'team-a' | 'team-b';
-                            side?: 'attack' | 'defense';
-                            attackingTeam?: 'team-a' | 'team-b';
-                            defendingTeam?: 'team-a' | 'team-b';
-                        } = {
-                            mapId: input.mapId,
-                            pickedBy: teamRole,
-                            side: pickedMapSide,
+            if (input.action === 'side') {
+                // Side action - update existing picked map with side assignment
+                const updatedPickedMaps = vetoState.pickedMaps.map(map => {
+                    if (map.mapId === input.mapId && !map.side) {
+                        const teamRoles = determineTeamRoles(map.pickedBy, input.side!);
+                        return {
+                            ...map,
+                            side: input.side!,
+                            attackingTeam: teamRoles.attackingTeam,
+                            defendingTeam: teamRoles.defendingTeam,
                         };
+                    }
+                    return map;
+                });
 
-                        // If side is selected, determine team roles
-                        if (pickedMapSide) {
-                            const teamRoles = determineTeamRoles(teamRole, pickedMapSide);
-                            pickedMap.attackingTeam = teamRoles.attackingTeam;
-                            pickedMap.defendingTeam = teamRoles.defendingTeam;
-                        }
+                newVetoState = {
+                    ...vetoState,
+                    actions: [...vetoState.actions, newAction],
+                    pickedMaps: updatedPickedMaps,
+                    vetoSequence: vetoState.vetoSequence.map((step, index) =>
+                        index === currentStep ? { ...step, completed: true } : step
+                    ),
+                    currentStep: currentStep + 1,
+                };
+            } else {
+                // Ban or pick actions
+                newVetoState = {
+                    ...vetoState,
+                    actions: [...vetoState.actions, newAction],
+                    availableMaps: vetoState.availableMaps.filter((m) => m !== input.mapId),
+                    bannedMaps: input.action === 'ban'
+                        ? [...vetoState.bannedMaps, input.mapId]
+                        : vetoState.bannedMaps,
+                    pickedMaps: input.action === 'pick'
+                        ? (() => {
+                            const pickedMapSide = (isDemolitionMap && isLastPickAction && room.roundType !== 'bo5') ? input.side : undefined;
 
-                        return [...vetoState.pickedMaps, pickedMap];
-                    })()
-                    : vetoState.pickedMaps,
-                vetoSequence: vetoState.vetoSequence.map((step, index) =>
-                    index === currentStep ? { ...step, completed: true } : step
-                ),
-                currentStep: currentStep + 1,
-            };
+                            const pickedMap: {
+                                mapId: string;
+                                pickedBy: 'team-a' | 'team-b';
+                                side?: 'attack' | 'defense';
+                                attackingTeam?: 'team-a' | 'team-b';
+                                defendingTeam?: 'team-a' | 'team-b';
+                            } = {
+                                mapId: input.mapId,
+                                pickedBy: teamRole,
+                                side: pickedMapSide,
+                            };
 
-            // Check if we need to let the opposite team choose side for the picked map
+                            // If side is selected, determine team roles
+                            if (pickedMapSide) {
+                                const teamRoles = determineTeamRoles(teamRole, pickedMapSide);
+                                pickedMap.attackingTeam = teamRoles.attackingTeam;
+                                pickedMap.defendingTeam = teamRoles.defendingTeam;
+                            }
+
+                            return [...vetoState.pickedMaps, pickedMap];
+                        })()
+                        : vetoState.pickedMaps,
+                    vetoSequence: vetoState.vetoSequence.map((step, index) =>
+                        index === currentStep ? { ...step, completed: true } : step
+                    ),
+                    currentStep: currentStep + 1,
+                };
+            }
+
+            // Check if veto is completed and determine next turn
             let vetoCompleted = newVetoState.currentStep >= newVetoState.vetoSequence.length;
             let nextTurn: string | null = null;
 
-            if (input.action === 'pick' && isDemolitionMap && !isLastPickAction) {
-                // For non-final demolition maps, the opposing team chooses the side
-                const opposingTeam = teamRole === 'team-a' ? 'team-b' : 'team-a';
-                vetoCompleted = false;
-                nextTurn = opposingTeam;
+            if (input.action === 'side') {
+                // Side action completed - move to next step in sequence
+                if (vetoCompleted) {
+                    nextTurn = null;
+                } else {
+                    nextTurn = newVetoState.vetoSequence[newVetoState.currentStep]?.team ?? null;
+                }
+            } else if (input.action === 'pick' && isDemolitionMap && !isLastPickAction) {
+                // For non-final demolition maps, check if next action is side by opposing team
+                const nextSequenceItem = newVetoState.vetoSequence[newVetoState.currentStep];
+                if (nextSequenceItem?.action === 'side') {
+                    // Side action is next in sequence - proceed normally
+                    vetoCompleted = false;
+                    nextTurn = nextSequenceItem.team;
+                } else {
+                    // No side action in sequence - the opposing team chooses the side (legacy behavior)
+                    const opposingTeam = teamRole === 'team-a' ? 'team-b' : 'team-a';
+                    vetoCompleted = false;
+                    nextTurn = opposingTeam;
+                }
             } else if (input.action === 'pick' && isDemolitionMap && isLastPickAction) {
-                // Final map picked - check if this is Bo5
+                // Final map picked - check if next action is side or if this is Bo5
+                const nextSequenceItem = newVetoState.vetoSequence[newVetoState.currentStep];
                 const isBo5 = room.roundType === 'bo5';
 
-                if (isBo5) {
-                    // Bo5 final map: The opposing team chooses the side
+                if (nextSequenceItem?.action === 'side') {
+                    // Side action is next in sequence - proceed normally
+                    vetoCompleted = false;
+                    nextTurn = nextSequenceItem.team;
+                } else if (isBo5 && !input.side) {
+                    // Bo5 final map without side in sequence - opposing team chooses side (legacy behavior)
                     const opposingTeam = teamRole === 'team-a' ? 'team-b' : 'team-a';
                     vetoCompleted = false;
                     nextTurn = opposingTeam;
                 } else {
-                    // Bo1/Bo3 final map: Side was selected by picking team - veto is complete
+                    // Side was selected by picking team or no side action needed - veto is complete
                     vetoCompleted = true;
                     nextTurn = null;
                 }

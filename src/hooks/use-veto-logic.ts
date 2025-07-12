@@ -108,6 +108,17 @@ export const useVetoLogic = ({
     const handleMapAction = async (mapId: string, action: ActionType): Promise<void> => {
         if (!teamRole || !isMyTurn) return;
 
+        // Handle side action type
+        if (action === 'side') {
+            // For side actions, we need to trigger side selection for the most recently picked map
+            const mostRecentPickedMap = vetoState?.pickedMaps[vetoState.pickedMaps.length - 1];
+            if (mostRecentPickedMap) {
+                setPendingMapId(mostRecentPickedMap.mapId);
+                setShowSideSelection(true);
+            }
+            return;
+        }
+
         const mapData = MAP_DATA[mapId];
 
         if (action === 'pick' && mapData?.isDemolition) {
@@ -146,9 +157,26 @@ export const useVetoLogic = ({
                 }
             }
         } else if (action === 'pick') {
-            // Non-demolition maps: require side selection
-            setPendingMapId(mapId);
-            setShowSideSelection(true);
+            // Check if the next action in sequence is a side action by the same or different team
+            const nextSequenceItem = vetoState?.vetoSequence[vetoState.currentStep + 1];
+            const shouldTriggerSideSelection = !nextSequenceItem || nextSequenceItem.action !== 'side';
+
+            if (shouldTriggerSideSelection && !mapData?.isDemolition) {
+                // Non-demolition maps: require side selection
+                setPendingMapId(mapId);
+                setShowSideSelection(true);
+            } else {
+                // Direct pick action (either demolition map or side will be handled separately)
+                try {
+                    await makeVetoActionMutation.mutateAsync({
+                        teamId: roomId,
+                        action,
+                        mapId,
+                    });
+                } catch (error) {
+                    console.error('Failed to make veto action:', error);
+                }
+            }
         } else {
             // Direct ban action
             try {
@@ -176,12 +204,26 @@ export const useVetoLogic = ({
                     side,
                 });
             } else if (pendingMapId) {
-                await makeVetoActionMutation.mutateAsync({
-                    teamId: roomId,
-                    action: 'pick',
-                    mapId: pendingMapId,
-                    side,
-                });
+                // Check if current action is a 'side' action in the sequence
+                const currentAction = currentSequenceItem?.action;
+
+                if (currentAction === 'side') {
+                    // This is a dedicated side action step
+                    await makeVetoActionMutation.mutateAsync({
+                        teamId: roomId,
+                        action: 'side',
+                        mapId: pendingMapId,
+                        side,
+                    });
+                } else {
+                    // This is a side selection after a pick
+                    await makeVetoActionMutation.mutateAsync({
+                        teamId: roomId,
+                        action: 'pick',
+                        mapId: pendingMapId,
+                        side,
+                    });
+                }
             }
         } catch (error) {
             console.error('Failed to make veto action:', error);

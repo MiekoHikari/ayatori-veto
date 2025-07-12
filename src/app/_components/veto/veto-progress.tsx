@@ -35,14 +35,16 @@ export const VetoProgress = ({ vetoState, teamAName, teamBName }: VetoProgressPr
                                                 : 'outline'
                                     }
                                     className={`flex items-center gap-1 transition-all duration-200 ${index === vetoState.currentStep && !step.completed
-                                            ? 'animate-pulse ring-2 ring-primary/30'
-                                            : ''
+                                        ? 'animate-pulse ring-2 ring-primary/30'
+                                        : ''
                                         }`}
                                 >
                                     {step.action === 'ban' ? (
                                         <Ban className="w-3 h-3" />
-                                    ) : (
+                                    ) : step.action === 'pick' ? (
                                         <Target className="w-3 h-3" />
+                                    ) : (
+                                        <Shield className="w-3 h-3" />
                                     )}
                                     {getTeamDisplayName(step.team, teamAName, teamBName)} {step.action}
                                     {step.completed && <CheckCircle className="w-3 h-3" />}
@@ -57,43 +59,49 @@ export const VetoProgress = ({ vetoState, teamAName, teamBName }: VetoProgressPr
                             <h4 className="font-medium mb-3">Recent Actions:</h4>
                             <div className="space-y-3 max-h-60 overflow-y-auto">
                                 {vetoState.actions.slice().reverse().map((action, index) => {
-                                    const mapData = MAP_DATA[action.mapId];
+                                    const mapData = action.mapId ? MAP_DATA[action.mapId] : null;
                                     return (
                                         <div
                                             key={index}
                                             className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border animate-in slide-in-from-left-2 duration-300"
                                             style={{ animationDelay: `${index * 100}ms` }}
                                         >
-                                            <div className="relative w-12 h-8 rounded-md overflow-hidden flex-shrink-0">
-                                                <Image
-                                                    src={mapData?.image ?? '/maps/placeholder.png'}
-                                                    alt={mapData?.name ?? action.mapId}
-                                                    fill
-                                                    className={`object-cover ${action.type === 'ban' ? 'grayscale' : ''}`}
-                                                />
-                                                {action.type === 'ban' && (
-                                                    <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                                                        <Ban className="w-3 h-3 text-red-500" />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            {action.type !== 'side' && action.mapId && (
+                                                <div className="relative w-12 h-8 rounded-md overflow-hidden flex-shrink-0">
+                                                    <Image
+                                                        src={mapData?.image ?? '/maps/placeholder.png'}
+                                                        alt={mapData?.name ?? action.mapId}
+                                                        fill
+                                                        className={`object-cover ${action.type === 'ban' ? 'grayscale' : ''}`}
+                                                    />
+                                                    {action.type === 'ban' && (
+                                                        <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
+                                                            <Ban className="w-3 h-3 text-red-500" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     {action.type === 'ban' ? (
                                                         <Ban className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                                    ) : (
+                                                    ) : action.type === 'pick' ? (
                                                         <Target className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                                    ) : (
+                                                        <Shield className="w-4 h-4 text-blue-500 flex-shrink-0" />
                                                     )}
                                                     <span className="font-medium text-sm">
                                                         {getTeamDisplayName(action.team, teamAName, teamBName)}
                                                     </span>
                                                     <span className="text-sm text-muted-foreground">
-                                                        {action.type}ned
+                                                        {action.type === 'side' ? 'chose side' : `${action.type}ned`}
                                                     </span>
-                                                    <Badge variant="outline" className="text-xs">
-                                                        {getMapDisplayName(action.mapId)}
-                                                    </Badge>
+                                                    {action.mapId && (
+                                                        <Badge variant="outline" className="text-xs">
+                                                            {getMapDisplayName(action.mapId)}
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 {action.side && (
                                                     <Badge

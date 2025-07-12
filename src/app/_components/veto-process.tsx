@@ -90,8 +90,15 @@ export default function VetoProcess({
         !showSideSelection &&
         !shouldShowOppositeSideSelection();
 
-    const shouldShowSideSelectionModal = showSideSelection || shouldShowOppositeSideSelection();
-    const sideSelectionMapId = pendingMapId ?? getMapForSideSelection();
+    const shouldShowSideSelectionModal = showSideSelection ||
+        shouldShowOppositeSideSelection() ||
+        (isMyTurn && currentSequenceItem?.action === 'side');
+
+    const sideSelectionMapId = pendingMapId ??
+        getMapForSideSelection() ??
+        (currentSequenceItem?.action === 'side' ?
+            vetoState?.pickedMaps.find(map => !map.side)?.mapId :
+            null);
 
     return (
         <div className="space-y-6">
@@ -118,8 +125,8 @@ export default function VetoProcess({
                 />
             )}
 
-            {/* Available Maps */}
-            {vetoState.availableMaps.length > 0 && (
+            {/* Available Maps - Only show for ban/pick actions, not side actions */}
+            {vetoState.availableMaps.length > 0 && currentSequenceItem?.action !== 'side' && (
                 <AvailableMaps
                     availableMaps={vetoState.availableMaps}
                     isMyTurn={isMyTurn}
