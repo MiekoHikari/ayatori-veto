@@ -10,6 +10,7 @@ import { Copy, Users, Eye, Crown, Clock } from 'lucide-react';
 import { api } from '~/trpc/react';
 import { type RoomData } from '~/types/room';
 import { getRoundLabel } from '~/constants/maps';
+import { copyToClipboard } from '~/lib/utils';
 
 interface RoomCreationProps {
     maps: string[];
@@ -70,21 +71,6 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
             }
         } finally {
             setIsCreating(false);
-        }
-    };
-
-    const copyToClipboard = async (text: string, _label: string) => {
-        try {
-            await navigator.clipboard.writeText(text);
-        } catch (error) {
-            console.error('Failed to copy:', error);
-            // Fallback for browsers that don't support clipboard API
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
         }
     };
 
@@ -210,7 +196,7 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => copyToClipboard(roomData.teamALink, 'Team A')}
+                                onClick={() => copyToClipboard(roomData.teamALink, 'Team A link')}
                             >
                                 <Copy className="w-4 h-4" />
                             </Button>
@@ -235,7 +221,7 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => copyToClipboard(roomData.teamBLink, 'Team B')}
+                                onClick={() => copyToClipboard(roomData.teamBLink, 'Team B link')}
                             >
                                 <Copy className="w-4 h-4" />
                             </Button>
@@ -260,7 +246,7 @@ export default function RoomCreation({ maps, roundType, onRoomCreatedAction: onR
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => copyToClipboard(roomData.spectatorLink, 'Spectator')}
+                                onClick={() => copyToClipboard(roomData.spectatorLink, 'Spectator link')}
                             >
                                 <Copy className="w-4 h-4" />
                             </Button>

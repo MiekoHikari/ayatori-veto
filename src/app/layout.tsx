@@ -7,6 +7,7 @@ import { TRPCReactProvider } from "~/trpc/react";
 import { ThemeProvider } from "~/components/theme-provider";
 import { TopNavigation } from "~/components/top-navigation";
 import { AuthProvider } from "~/components/auth-provider";
+import { Toaster } from "~/components/ui/sonner";
 
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -40,6 +41,7 @@ export default function RootLayout({
               <main className="min-h-screen bg-background">
                 {children}
               </main>
+              <Toaster />
             </TRPCReactProvider>
           </AuthProvider>
         </ThemeProvider>
