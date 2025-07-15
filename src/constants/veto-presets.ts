@@ -118,7 +118,7 @@ export const VETO_PRESETS: VetoPreset[] = [
             { team: 'team-b', action: 'pick' },
             { team: 'team-a', action: 'side' }
         ]
-    }
+    },
     {
         id: 'bo5-mightymeow',
         name: 'Mighty Meow BO5',
