@@ -35,11 +35,47 @@ export const VETO_PRESETS: VetoPreset[] = [
             { team: 'team-a', action: 'side' }
         ]
     },
+    {
+        id: 'bo1-mightymeow',
+        name: 'Mighty Meow BO1',
+        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations',
+        roundType: 'bo1',
+        minMaps: 7,
+        sequence: [
+            { team: 'team-a', action: 'ban' },
+            { team: 'team-b', action: 'ban' },
+            { team: 'team-a', action: 'ban' },
+            { team: 'team-b', action: 'ban' },
+            { team: 'team-a', action: 'ban' },
+            { team: 'team-b', action: 'ban' },
+            { team: 'team-b', action: 'pick' },
+            { team: 'team-a', action: 'side' }
+        ]
+    },
     // BO3 Presets
     {
         id: 'bo3-ayatori',
         name: 'Ayatori BO3',
         description: 'Map Veto based on Ayatori\'s Rules and Regulations',
+        roundType: 'bo3',
+        minMaps: 7,
+        sequence: [
+            { team: 'team-a', action: 'ban' },
+            { team: 'team-b', action: 'ban' },
+            { team: 'team-a', action: 'pick' },
+            { team: 'team-b', action: 'side' },
+            { team: 'team-b', action: 'pick' },
+            { team: 'team-a', action: 'side' },
+            { team: 'team-a', action: 'ban' },
+            { team: 'team-b', action: 'ban' },
+            { team: 'team-b', action: 'pick' },
+            { team: 'team-a', action: 'side' }
+        ]
+    },
+    {
+        id: 'bo3-mightymeow',
+        name: 'Mighty Meow BO3',
+        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations',
         roundType: 'bo3',
         minMaps: 7,
         sequence: [
@@ -61,6 +97,32 @@ export const VETO_PRESETS: VetoPreset[] = [
         id: 'bo5-ayatori',
         name: 'Ayatori BO5',
         description: 'Map Veto based on Ayatori\'s Rules and Regulations',
+        roundType: 'bo5',
+        minMaps: 7,
+        sequence: [
+            { team: 'team-a', action: 'ban' },
+            { team: 'team-b', action: 'ban' },
+
+            { team: 'team-a', action: 'pick' },
+            { team: 'team-b', action: 'side' },
+
+            { team: 'team-b', action: 'pick' },
+            { team: 'team-a', action: 'side' },
+
+            { team: 'team-a', action: 'pick' },
+            { team: 'team-b', action: 'side' },
+
+            { team: 'team-b', action: 'pick' },
+            { team: 'team-a', action: 'side' },
+
+            { team: 'team-b', action: 'pick' },
+            { team: 'team-a', action: 'side' }
+        ]
+    }
+    {
+        id: 'bo5-mightymeow',
+        name: 'Mighty Meow BO5',
+        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations',
         roundType: 'bo5',
         minMaps: 7,
         sequence: [
