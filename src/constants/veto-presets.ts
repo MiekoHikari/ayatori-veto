@@ -271,7 +271,7 @@ export const generateDynamicSequence = (
         // BO1 Ayatori Standard: A-ban, B-ban, A-ban, B-ban, A-ban, B-ban, B-pick, A-side
         // Scale the initial bans based on available maps
         const initialBans = Math.min(6, bansNeeded);
-        
+
         // Add alternating bans (A starts)
         for (let i = 0; i < initialBans; i++) {
             sequence.push({
@@ -279,7 +279,7 @@ export const generateDynamicSequence = (
                 action: 'ban'
             });
         }
-        
+
         // Add remaining bans if needed (continue alternating from where we left off)
         for (let i = initialBans; i < bansNeeded; i++) {
             sequence.push({
@@ -287,13 +287,13 @@ export const generateDynamicSequence = (
                 action: 'ban'
             });
         }
-        
+
         // Team B picks the map
         sequence.push({
             team: 'team-b',
             action: 'pick'
         });
-        
+
         // Team A chooses side
         if (includeSidePicks) {
             sequence.push({
@@ -303,25 +303,25 @@ export const generateDynamicSequence = (
         }
     } else if (roundType === 'bo3') {
         // BO3 Ayatori Standard: A-ban, B-ban, A-pick, B-side, B-pick, A-side, A-ban, B-ban, B-pick, A-side
-        
+
         // Initial 2 bans
         if (bansNeeded >= 2) {
             sequence.push({ team: 'team-a', action: 'ban' });
             sequence.push({ team: 'team-b', action: 'ban' });
         }
-        
+
         // First pick and side
         sequence.push({ team: 'team-a', action: 'pick' });
         if (includeSidePicks) {
             sequence.push({ team: 'team-b', action: 'side' });
         }
-        
+
         // Second pick and side
         sequence.push({ team: 'team-b', action: 'pick' });
         if (includeSidePicks) {
             sequence.push({ team: 'team-a', action: 'side' });
         }
-        
+
         // Additional bans in the middle if needed
         const remainingBans = bansNeeded - 2;
         if (remainingBans > 0) {
@@ -333,7 +333,7 @@ export const generateDynamicSequence = (
                 });
             }
         }
-        
+
         // Final pick and side
         sequence.push({ team: 'team-b', action: 'pick' });
         if (includeSidePicks) {
@@ -341,13 +341,13 @@ export const generateDynamicSequence = (
         }
     } else if (roundType === 'bo5') {
         // BO5 Ayatori Standard: A-ban, B-ban, then alternating picks with opposing team choosing sides
-        
+
         // Initial 2 bans
         if (bansNeeded >= 2) {
             sequence.push({ team: 'team-a', action: 'ban' });
             sequence.push({ team: 'team-b', action: 'ban' });
         }
-        
+
         // Add remaining bans if needed (continue alternating)
         const remainingBans = bansNeeded - 2;
         if (remainingBans > 0) {
@@ -358,17 +358,17 @@ export const generateDynamicSequence = (
                 });
             }
         }
-        
+
         // 5 picks with opposing team choosing sides (A starts picking)
         for (let i = 0; i < 5; i++) {
             const pickingTeam = i % 2 === 0 ? 'team-a' : 'team-b';
             const sideChoosingTeam = pickingTeam === 'team-a' ? 'team-b' : 'team-a';
-            
+
             sequence.push({
                 team: pickingTeam,
                 action: 'pick'
             });
-            
+
             if (includeSidePicks) {
                 sequence.push({
                     team: sideChoosingTeam,
