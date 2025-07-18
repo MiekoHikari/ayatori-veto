@@ -266,35 +266,115 @@ export const generateDynamicSequence = (
     const expectedPicks = roundType === 'bo1' ? 1 : roundType === 'bo3' ? 3 : 5;
     const bansNeeded = mapCount - expectedPicks;
 
-    // Add alternating bans
-    for (let i = 0; i < bansNeeded; i++) {
+    // Follow Ayatori's veto standards regardless of map count
+    if (roundType === 'bo1') {
+        // BO1 Ayatori Standard: A-ban, B-ban, A-ban, B-ban, A-ban, B-ban, B-pick, A-side
+        // Scale the initial bans based on available maps
+        const initialBans = Math.min(6, bansNeeded);
+        
+        // Add alternating bans (A starts)
+        for (let i = 0; i < initialBans; i++) {
+            sequence.push({
+                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                action: 'ban'
+            });
+        }
+        
+        // Add remaining bans if needed (continue alternating from where we left off)
+        for (let i = initialBans; i < bansNeeded; i++) {
+            sequence.push({
+                team: i % 2 === 0 ? 'team-a' : 'team-b',
+                action: 'ban'
+            });
+        }
+        
+        // Team B picks the map
         sequence.push({
-            team: i % 2 === 0 ? 'team-a' : 'team-b',
-            action: 'ban'
-        });
-    }
-
-    // Add alternating picks with optional side choices
-    for (let i = 0; i < expectedPicks; i++) {
-        const pickingTeam = i % 2 === 0 ? 'team-a' : 'team-b';
-
-        // Add pick action
-        sequence.push({
-            team: pickingTeam,
+            team: 'team-b',
             action: 'pick'
         });
-
-        // Add side choice action if enabled
+        
+        // Team A chooses side
         if (includeSidePicks) {
-            // For fairness, alternate who chooses sides, or let the non-picking team choose
-            const sideChoosingTeam = roundType === 'bo1'
-                ? pickingTeam  // In BO1, picker chooses side
-                : pickingTeam === 'team-a' ? 'team-b' : 'team-a'; // In BO3/BO5, opposing team chooses side
-
             sequence.push({
-                team: sideChoosingTeam,
+                team: 'team-a',
                 action: 'side'
             });
+        }
+    } else if (roundType === 'bo3') {
+        // BO3 Ayatori Standard: A-ban, B-ban, A-pick, B-side, B-pick, A-side, A-ban, B-ban, B-pick, A-side
+        
+        // Initial 2 bans
+        if (bansNeeded >= 2) {
+            sequence.push({ team: 'team-a', action: 'ban' });
+            sequence.push({ team: 'team-b', action: 'ban' });
+        }
+        
+        // First pick and side
+        sequence.push({ team: 'team-a', action: 'pick' });
+        if (includeSidePicks) {
+            sequence.push({ team: 'team-b', action: 'side' });
+        }
+        
+        // Second pick and side
+        sequence.push({ team: 'team-b', action: 'pick' });
+        if (includeSidePicks) {
+            sequence.push({ team: 'team-a', action: 'side' });
+        }
+        
+        // Additional bans in the middle if needed
+        const remainingBans = bansNeeded - 2;
+        if (remainingBans > 0) {
+            // Add remaining bans (A starts the second round of bans)
+            for (let i = 0; i < remainingBans; i++) {
+                sequence.push({
+                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                    action: 'ban'
+                });
+            }
+        }
+        
+        // Final pick and side
+        sequence.push({ team: 'team-b', action: 'pick' });
+        if (includeSidePicks) {
+            sequence.push({ team: 'team-a', action: 'side' });
+        }
+    } else if (roundType === 'bo5') {
+        // BO5 Ayatori Standard: A-ban, B-ban, then alternating picks with opposing team choosing sides
+        
+        // Initial 2 bans
+        if (bansNeeded >= 2) {
+            sequence.push({ team: 'team-a', action: 'ban' });
+            sequence.push({ team: 'team-b', action: 'ban' });
+        }
+        
+        // Add remaining bans if needed (continue alternating)
+        const remainingBans = bansNeeded - 2;
+        if (remainingBans > 0) {
+            for (let i = 0; i < remainingBans; i++) {
+                sequence.push({
+                    team: i % 2 === 0 ? 'team-a' : 'team-b',
+                    action: 'ban'
+                });
+            }
+        }
+        
+        // 5 picks with opposing team choosing sides (A starts picking)
+        for (let i = 0; i < 5; i++) {
+            const pickingTeam = i % 2 === 0 ? 'team-a' : 'team-b';
+            const sideChoosingTeam = pickingTeam === 'team-a' ? 'team-b' : 'team-a';
+            
+            sequence.push({
+                team: pickingTeam,
+                action: 'pick'
+            });
+            
+            if (includeSidePicks) {
+                sequence.push({
+                    team: sideChoosingTeam,
+                    action: 'side'
+                });
+            }
         }
     }
 

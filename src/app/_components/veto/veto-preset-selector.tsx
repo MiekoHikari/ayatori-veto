@@ -102,7 +102,7 @@ export function VetoPresetSelector({
                                     <div>
                                         <h3 className="font-medium text-blue-900 dark:text-blue-100">Quick Start</h3>
                                         <p className="text-sm text-blue-700 dark:text-blue-300">
-                                            Use the standard format for {roundType.toUpperCase()} with {mapCount} maps
+                                            Use Ayatori&apos;s veto format for {roundType.toUpperCase()} with {mapCount} maps
                                         </p>
                                         <div className="flex flex-wrap gap-1 mt-2">
                                             {generateDynamicSequence(roundType, mapCount, false).map((step, index) => (
@@ -121,7 +121,7 @@ export function VetoPresetSelector({
                                         </div>
                                     </div>
                                     <Button onClick={handleQuickStart} className="bg-blue-600 hover:bg-blue-700">
-                                        Use Standard
+                                        Use Ayatori Format
                                     </Button>
                                 </div>
                             </div>
