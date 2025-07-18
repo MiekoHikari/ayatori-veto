@@ -11,7 +11,11 @@ import { ChevronDown, Settings, Zap } from 'lucide-react';
 import {
     getPresetsForRoundType,
     getPresetById,
-    generateDynamicSequence
+    generateDynamicSequence,
+    isPresetAvailable,
+    getAvailablePresets,
+    getUnavailablePresets,
+    getPresetRequirementText
 } from '~/constants/veto-presets';
 import type { VetoPreset } from '~/constants/veto-presets';
 
@@ -32,8 +36,9 @@ export function VetoPresetSelector({
 }: VetoPresetSelectorProps) {
     const [isOpen, setIsOpen] = useState(true);
 
-    const presets = getPresetsForRoundType(roundType);
-    const availablePresets = presets.filter(preset => mapCount >= preset.minMaps);
+    const allPresets = getPresetsForRoundType(roundType);
+    const availablePresets = getAvailablePresets(roundType, mapCount);
+    const unavailablePresets = getUnavailablePresets(roundType, mapCount);
 
     const handlePresetChange = (presetId: string) => {
         if (presetId === 'custom') {
@@ -42,7 +47,7 @@ export function VetoPresetSelector({
         }
 
         const preset = getPresetById(presetId);
-        if (preset) {
+        if (preset && isPresetAvailable(preset, mapCount)) {
             onPresetSelectAction(presetId, preset.sequence);
         }
     };
@@ -122,7 +127,7 @@ export function VetoPresetSelector({
                             </div>
 
                             {/* Preset Selection */}
-                            {availablePresets.length > 0 && (
+                            {allPresets.length > 0 && (
                                 <div>
                                     <h3 className="font-medium mb-3">Preset Formats</h3>
                                     <RadioGroup
@@ -130,6 +135,7 @@ export function VetoPresetSelector({
                                         onValueChange={handlePresetChange}
                                         className="space-y-3"
                                     >
+                                        {/* Available Presets */}
                                         {availablePresets.map((preset) => (
                                             <div key={preset.id} className="flex items-start space-x-3 space-y-0">
                                                 <RadioGroupItem
@@ -144,6 +150,42 @@ export function VetoPresetSelector({
                                                                 <span className="font-medium">{preset.name}</span>
                                                                 <Badge variant="outline" className="text-xs">
                                                                     {preset.roundType.toUpperCase()}
+                                                                </Badge>
+                                                                <Badge variant="default" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                                                    Available
+                                                                </Badge>
+                                                            </div>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {preset.description}
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {getSequencePreview(preset)}
+                                                            </div>
+                                                        </div>
+                                                    </Label>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Unavailable Presets */}
+                                        {unavailablePresets.map((preset) => (
+                                            <div key={preset.id} className="flex items-start space-x-3 space-y-0 opacity-60">
+                                                <RadioGroupItem
+                                                    value={preset.id}
+                                                    id={preset.id}
+                                                    className="mt-1"
+                                                    disabled
+                                                />
+                                                <div className="flex-1">
+                                                    <Label htmlFor={preset.id} className="cursor-not-allowed">
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-muted-foreground">{preset.name}</span>
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {preset.roundType.toUpperCase()}
+                                                                </Badge>
+                                                                <Badge variant="destructive" className="text-xs">
+                                                                    {getPresetRequirementText(preset)}
                                                                 </Badge>
                                                             </div>
                                                             <p className="text-sm text-muted-foreground">

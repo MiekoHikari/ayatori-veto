@@ -11,7 +11,9 @@ import {
     getPresetsForRoundType,
     getPresetById,
     validateVetoSequence,
-    generateDynamicSequence
+    generateDynamicSequence,
+    isPresetAvailable,
+    getPresetRequirementText
 } from '~/constants/veto-presets';
 import type { VetoPreset } from '~/constants/veto-presets';
 
@@ -60,7 +62,7 @@ export function VetoOrderBuilder({
     const handlePresetSelect = (presetId: string) => {
         setSelectedPreset(presetId);
         const preset = getPresetById(presetId);
-        if (preset && mapCount >= preset.minMaps) {
+        if (preset && isPresetAvailable(preset, mapCount)) {
             setSequence([...preset.sequence]);
         }
     };
@@ -182,16 +184,28 @@ export function VetoOrderBuilder({
                             <SelectValue placeholder="Select a veto preset" />
                         </SelectTrigger>
                         <SelectContent>
-                            {presets
-                                .filter(preset => mapCount >= preset.minMaps)
-                                .map(preset => (
-                                    <SelectItem key={preset.id} value={preset.id}>
+                            {presets.map(preset => {
+                                const available = isPresetAvailable(preset, mapCount);
+                                return (
+                                    <SelectItem
+                                        key={preset.id}
+                                        value={preset.id}
+                                        disabled={!available}
+                                    >
                                         <div>
-                                            <div className="font-medium">{preset.name}</div>
+                                            <div className={`font-medium ${!available ? 'text-muted-foreground' : ''}`}>
+                                                {preset.name}
+                                                {!available && (
+                                                    <span className="ml-2 text-xs text-red-600">
+                                                        ({getPresetRequirementText(preset)})
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-xs text-muted-foreground">{preset.description}</div>
                                         </div>
                                     </SelectItem>
-                                ))}
+                                );
+                            })}
                         </SelectContent>
                     </Select>
                 </div>

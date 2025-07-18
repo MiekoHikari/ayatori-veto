@@ -12,6 +12,7 @@ export interface VetoPreset {
     roundType: 'bo1' | 'bo3' | 'bo5';
     minMaps: number;
     maxMaps?: number;
+    exactMaps?: number; // If set, this preset requires exactly this many maps
     sequence: Omit<VetoStep, 'completed'>[];
 }
 
@@ -21,9 +22,10 @@ export const VETO_PRESETS: VetoPreset[] = [
     {
         id: 'bo1-ayatori',
         name: 'Ayatori BO1',
-        description: 'Map Veto based on Ayatori\'s Rules and Regulations',
+        description: 'Map Veto based on Ayatori\'s Rules and Regulations - Requires exactly 7 maps',
         roundType: 'bo1',
         minMaps: 7,
+        exactMaps: 7,
         sequence: [
             { team: 'team-a', action: 'ban' },
             { team: 'team-b', action: 'ban' },
@@ -38,9 +40,10 @@ export const VETO_PRESETS: VetoPreset[] = [
     {
         id: 'bo1-mightymeow',
         name: 'Mighty Meow BO1',
-        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations',
+        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations - Requires exactly 7 maps',
         roundType: 'bo1',
         minMaps: 7,
+        exactMaps: 7,
         sequence: [
             { team: 'team-a', action: 'ban' },
             { team: 'team-b', action: 'ban' },
@@ -56,9 +59,10 @@ export const VETO_PRESETS: VetoPreset[] = [
     {
         id: 'bo3-ayatori',
         name: 'Ayatori BO3',
-        description: 'Map Veto based on Ayatori\'s Rules and Regulations',
+        description: 'Map Veto based on Ayatori\'s Rules and Regulations - Requires exactly 7 maps',
         roundType: 'bo3',
         minMaps: 7,
+        exactMaps: 7,
         sequence: [
             { team: 'team-a', action: 'ban' },
             { team: 'team-b', action: 'ban' },
@@ -75,9 +79,10 @@ export const VETO_PRESETS: VetoPreset[] = [
     {
         id: 'bo3-mightymeow',
         name: 'Mighty Meow BO3',
-        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations',
+        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations - Requires exactly 7 maps',
         roundType: 'bo3',
         minMaps: 7,
+        exactMaps: 7,
         sequence: [
             { team: 'team-a', action: 'ban' },
             { team: 'team-b', action: 'ban' },
@@ -96,9 +101,10 @@ export const VETO_PRESETS: VetoPreset[] = [
     {
         id: 'bo5-ayatori',
         name: 'Ayatori BO5',
-        description: 'Map Veto based on Ayatori\'s Rules and Regulations',
+        description: 'Map Veto based on Ayatori\'s Rules and Regulations - Requires exactly 7 maps',
         roundType: 'bo5',
         minMaps: 7,
+        exactMaps: 7,
         sequence: [
             { team: 'team-a', action: 'ban' },
             { team: 'team-b', action: 'ban' },
@@ -122,9 +128,10 @@ export const VETO_PRESETS: VetoPreset[] = [
     {
         id: 'bo5-mightymeow',
         name: 'Mighty Meow BO5',
-        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations',
+        description: 'Map Veto based on Mighty Meow\'s Rules and Regulations - Requires exactly 7 maps',
         roundType: 'bo5',
         minMaps: 7,
+        exactMaps: 7,
         sequence: [
             { team: 'team-a', action: 'ban' },
             { team: 'team-b', action: 'ban' },
@@ -154,6 +161,28 @@ export const getPresetsForRoundType = (roundType: 'bo1' | 'bo3' | 'bo5'): VetoPr
 
 export const getPresetById = (id: string): VetoPreset | undefined => {
     return VETO_PRESETS.find(preset => preset.id === id);
+};
+
+export const isPresetAvailable = (preset: VetoPreset, mapCount: number): boolean => {
+    if (preset.exactMaps) {
+        return mapCount === preset.exactMaps;
+    }
+    return mapCount >= preset.minMaps && (!preset.maxMaps || mapCount <= preset.maxMaps);
+};
+
+export const getAvailablePresets = (roundType: 'bo1' | 'bo3' | 'bo5', mapCount: number): VetoPreset[] => {
+    return getPresetsForRoundType(roundType).filter(preset => isPresetAvailable(preset, mapCount));
+};
+
+export const getUnavailablePresets = (roundType: 'bo1' | 'bo3' | 'bo5', mapCount: number): VetoPreset[] => {
+    return getPresetsForRoundType(roundType).filter(preset => !isPresetAvailable(preset, mapCount));
+};
+
+export const getPresetRequirementText = (preset: VetoPreset): string => {
+    if (preset.exactMaps) {
+        return `Requires exactly ${preset.exactMaps} maps`;
+    }
+    return `Requires ${preset.minMaps}+ maps`;
 };
 
 export const validateVetoSequence = (
@@ -191,6 +220,20 @@ export const validateVetoSequence = (
     // Validate minimum maps available
     if (mapCount - bans < picks) {
         errors.push(`Not enough maps remain after bans to complete picks`);
+    }
+
+    // Special validation for Ayatori and Mighty Meow presets
+    // These presets are designed specifically for 7 maps and break with other counts
+    const isAyatoriOrMightyMeow = (
+        bans === 6 && picks === 1 && roundType === 'bo1' // BO1 Ayatori/Mighty Meow pattern
+    ) || (
+            bans === 4 && picks === 3 && roundType === 'bo3' // BO3 Ayatori/Mighty Meow pattern
+        ) || (
+            bans === 2 && picks === 5 && roundType === 'bo5' // BO5 Ayatori/Mighty Meow pattern
+        );
+
+    if (isAyatoriOrMightyMeow && mapCount !== 7) {
+        errors.push(`This veto format is designed for exactly 7 maps (Ayatori/Mighty Meow rules)`);
     }
 
     // Validate side actions come after their corresponding picks
