@@ -5,7 +5,8 @@ import { MAP_DATA } from '~/constants/maps';
 import { useSupabaseRoomUpdates } from '~/hooks/use-supabase-realtime';
 
 interface UseVetoLogicProps {
-    roomId: string;
+    masterRoomId: string; // For realtime subscriptions
+    teamRoomId: string;   // For API calls
     teamRole?: TeamType;
     isSpectator?: boolean;
     roundType?: string;
@@ -13,7 +14,8 @@ interface UseVetoLogicProps {
 }
 
 export const useVetoLogic = ({
-    roomId,
+    masterRoomId,
+    teamRoomId,
     teamRole,
     isSpectator = false,
     roundType,
@@ -22,13 +24,13 @@ export const useVetoLogic = ({
     const [showSideSelection, setShowSideSelection] = useState(false);
     const [pendingMapId, setPendingMapId] = useState<string | null>(null);
 
-    // Queries
+    // Queries - use masterRoomId to get shared veto state
     const vetoStateQuery = api.room.getVetoState.useQuery(
-        { roomId },
+        { roomId: masterRoomId },
         { refetchInterval: 2000 }
     );
 
-    // Supabase realtime updates for veto actions
+    // Supabase realtime updates for veto actions - use masterRoomId for shared updates
     const handleVetoUpdate = useCallback((update: { type: string; data?: Record<string, unknown> }) => {
         console.log('Received veto update:', update);
 
@@ -39,7 +41,7 @@ export const useVetoLogic = ({
     }, [vetoStateQuery]);
 
     const { broadcastVetoUpdate, latency: realtimeLatency, isConnected: realtimeConnected } = useSupabaseRoomUpdates({
-        roomId,
+        roomId: masterRoomId, // Use masterRoomId for shared realtime channel
         enabled: !isSpectator,
         onUpdate: handleVetoUpdate,
     });
@@ -152,7 +154,7 @@ export const useVetoLogic = ({
                     // Bo5 final map: opposing team chooses side
                     try {
                         await makeVetoActionMutation.mutateAsync({
-                            teamId: roomId,
+                            teamId: teamRoomId, // Use teamRoomId for API calls
                             action,
                             mapId,
                         });
@@ -168,7 +170,7 @@ export const useVetoLogic = ({
                 // Non-final demolition maps: opposing team chooses side
                 try {
                     await makeVetoActionMutation.mutateAsync({
-                        teamId: roomId,
+                        teamId: teamRoomId, // Use teamRoomId for API calls
                         action,
                         mapId,
                     });
@@ -189,7 +191,7 @@ export const useVetoLogic = ({
                 // Direct pick action (either demolition map or side will be handled separately)
                 try {
                     await makeVetoActionMutation.mutateAsync({
-                        teamId: roomId,
+                        teamId: teamRoomId, // Use teamRoomId for API calls
                         action,
                         mapId,
                     });
@@ -201,7 +203,7 @@ export const useVetoLogic = ({
             // Direct ban action
             try {
                 await makeVetoActionMutation.mutateAsync({
-                    teamId: roomId,
+                    teamId: teamRoomId, // Use teamRoomId for API calls
                     action,
                     mapId,
                 });
@@ -219,7 +221,7 @@ export const useVetoLogic = ({
 
             if (mapForSideSelection && shouldShowOppositeSideSelection()) {
                 await selectSideForMapMutation.mutateAsync({
-                    teamId: roomId,
+                    teamId: teamRoomId, // Use teamRoomId for API calls
                     mapId: mapForSideSelection,
                     side,
                 });
@@ -230,7 +232,7 @@ export const useVetoLogic = ({
                 if (currentAction === 'side') {
                     // This is a dedicated side action step
                     await makeVetoActionMutation.mutateAsync({
-                        teamId: roomId,
+                        teamId: teamRoomId, // Use teamRoomId for API calls
                         action: 'side',
                         mapId: pendingMapId,
                         side,
@@ -238,7 +240,7 @@ export const useVetoLogic = ({
                 } else {
                     // This is a side selection after a pick
                     await makeVetoActionMutation.mutateAsync({
-                        teamId: roomId,
+                        teamId: teamRoomId, // Use teamRoomId for API calls
                         action: 'pick',
                         mapId: pendingMapId,
                         side,

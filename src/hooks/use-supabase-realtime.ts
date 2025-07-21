@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '~/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -16,6 +16,7 @@ interface BroadcastPayload {
     room?: string;
     data?: Record<string, unknown>;
     timestamp?: number;
+    clientId?: string;
 }
 
 interface UseSupabaseRoomUpdatesOptions {
@@ -28,10 +29,13 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const channelRef = useRef<RealtimeChannel | null>(null);
-    const [latency, setLatency] = useState<number>(0);
+    const [latency, setLatency] = useState<number>(-1); // Initialize to -1 to distinguish from actual 0ms latency
+    const onUpdateRef = useRef(onUpdate);
 
-    // Generate a simple client ID using Math.random and timestamp
-    const clientId = useRef(`client_${Math.random().toString(36).substring(2)}_${Date.now()}`);
+    // Keep the callback ref up to date
+    onUpdateRef.current = onUpdate;
+
+    const [clientId] = useState<string>(() => `client_${Math.random().toString(36).substring(2)}_${Date.now()}`);
 
     useEffect(() => {
         if (!enabled || !roomId) {
@@ -43,8 +47,8 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
         // Create a channel for this specific room
         const channel = supabase.channel(`room:${roomId}`, {
             config: {
-                broadcast: { self: false },
-                presence: { key: clientId.current },
+                broadcast: { self: true, ack: true }, // Allow self messages for ping latency
+                presence: { key: clientId },
             },
         });
 
@@ -66,25 +70,39 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
                 timestamp: broadcastPayload?.timestamp ?? Date.now(),
             };
 
-            onUpdate?.(update);
+            onUpdateRef.current?.(update);
         };
 
         // Subscribe to broadcast messages for room updates
         channel
             .on('broadcast', { event: 'room-update' }, (payload) => {
+                // Skip our own room updates to avoid duplicate processing
+                const broadcastPayload = payload.payload as BroadcastPayload;
+                if (broadcastPayload?.clientId === clientId) {
+                    console.log('📨 Skipping own room update');
+                    return;
+                }
                 console.log('📨 Received room update:', payload);
                 handleUpdate({ payload: payload.payload as BroadcastPayload });
             })
             .on('broadcast', { event: 'veto-update' }, (payload) => {
+                // Skip our own veto updates to avoid duplicate processing
+                const broadcastPayload = payload.payload as BroadcastPayload;
+                if (broadcastPayload?.clientId === clientId) {
+                    console.log('🎮 Skipping own veto update');
+                    return;
+                }
                 console.log('🎮 Received veto update:', payload);
                 handleUpdate({ payload: payload.payload as BroadcastPayload });
             })
             .on('broadcast', { event: 'ping' }, (payload) => {
                 // Handle ping responses for latency calculation
-                const pingPayload = payload.payload as { timestamp?: number };
-                if (pingPayload?.timestamp) {
+                const pingPayload = payload?.payload as { clientId?: string; timestamp?: number };
+                if (pingPayload?.clientId === clientId && typeof pingPayload.timestamp === 'number') {
                     const currentTime = Date.now();
                     const pingLatency = currentTime - pingPayload.timestamp;
+
+                    console.log(`🏓 Setting latency state to: ${pingLatency}ms`);
                     setLatency(pingLatency);
                     console.log(`🏓 Ping latency: ${pingLatency}ms`);
                 }
@@ -112,18 +130,18 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
                 }
             });
 
-        // Set up latency monitoring with ping every 10 seconds
+        // Set up latency monitoring with ping every second
         const latencyInterval = setInterval(() => {
             if (channelRef.current) {
                 const pingTimestamp = Date.now();
-                console.log(`🏓 Sending ping for room:${roomId}`);
+                console.log(`🏓 Sending ping for room: ${roomId}`);
                 void channelRef.current.send({
                     type: 'broadcast',
                     event: 'ping',
-                    payload: { timestamp: pingTimestamp },
+                    payload: { clientId: clientId, timestamp: pingTimestamp },
                 });
             }
-        }, 10000);
+        }, 1000);
 
         return () => {
             console.log(`🧹 Cleaning up Supabase channel for room:${roomId}`);
@@ -134,10 +152,10 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
             }
             setIsConnected(false);
         };
-    }, [roomId, enabled, onUpdate]);
+    }, [roomId, enabled, clientId]);
 
     // Method to send updates (for when this client makes changes)
-    const broadcastRoomUpdate = async (type: string, data?: Record<string, unknown>) => {
+    const broadcastRoomUpdate = useCallback(async (type: string, data?: Record<string, unknown>) => {
         if (!channelRef.current) {
             console.warn(`Cannot broadcast room update: channel not available for room:${roomId}`);
             return;
@@ -148,6 +166,7 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
             room: roomId,
             data,
             timestamp: Date.now(),
+            clientId, // Include clientId for filtering
         };
 
         console.log('📤 Broadcasting room update:', payload);
@@ -157,9 +176,9 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
             event: 'room-update',
             payload,
         });
-    };
+    }, [roomId, clientId]);
 
-    const broadcastVetoUpdate = async (type: string, data?: Record<string, unknown>) => {
+    const broadcastVetoUpdate = useCallback(async (type: string, data?: Record<string, unknown>) => {
         if (!channelRef.current) {
             console.warn(`Cannot broadcast veto update: channel not available for room:${roomId}`);
             return;
@@ -170,6 +189,7 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
             room: roomId,
             data,
             timestamp: Date.now(),
+            clientId, // Include clientId for filtering
         };
 
         console.log('🎮 Broadcasting veto update:', payload);
@@ -179,7 +199,7 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
             event: 'veto-update',
             payload,
         });
-    };
+    }, [roomId, clientId]);
 
     return {
         isConnected,

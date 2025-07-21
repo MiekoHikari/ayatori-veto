@@ -11,7 +11,8 @@ import { VetoProgress } from './veto/veto-progress';
 import type { VetoProcessProps } from '~/types/veto';
 
 export default function VetoProcess({
-    roomId,
+    masterRoomId,
+    teamRoomId,
     teamRole,
     isSpectator = false,
     teamAName,
@@ -44,7 +45,8 @@ export default function VetoProcess({
         // Mutation states
         isActionPending,
     } = useVetoLogic({
-        roomId,
+        masterRoomId,
+        teamRoomId,
         teamRole,
         isSpectator,
         roundType,

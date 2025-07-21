@@ -46,13 +46,21 @@ export default function RoomPage() {
             void masterRoomQuery.refetch();
             void teamRoomQuery.refetch();
         }
-    }, [masterRoomQuery, teamRoomQuery]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [masterRoomQuery.refetch, teamRoomQuery.refetch]);
 
-    const { isConnected: realtimeConnected, latency, broadcastRoomUpdate } = useSupabaseRoomUpdates({
-        roomId,
-        enabled: !!roomData,
+    const enabledRealtime = Boolean(roomData);
+    const supabaseRealtime = useSupabaseRoomUpdates({
+        roomId: roomData?.masterRoomId ?? roomId,
+        enabled: enabledRealtime,
         onUpdate: handleRealtimeUpdate,
     });
+
+    // Use the values directly from the hook instead of storing in separate state
+    const { isConnected: realtimeConnected, latency, broadcastRoomUpdate } = supabaseRealtime;
+
+    // Debug latency value
+    console.log('🎯 Page component latency value:', latency);
 
     const updateTeamReadyMutation = api.room.updateTeamReady.useMutation({
         onSuccess: (updatedRoom) => {
@@ -153,7 +161,7 @@ export default function RoomPage() {
     };
 
     const getLatencyDisplay = (latency: number): string => {
-        if (latency < 0) return 'Error';
+        if (latency < 0) return 'Measuring...';
         if (latency < 100) return `${latency}ms`;
         if (latency < 1000) return `${latency}ms`;
         return `${(latency / 1000).toFixed(1)}s`;
@@ -446,7 +454,8 @@ export default function RoomPage() {
                             {roomData.teamAReady && roomData.teamBReady && (
                                 <div className="border-t pt-6">
                                     <VetoProcess
-                                        roomId={roomId}
+                                        masterRoomId={roomData.masterRoomId ?? roomId}
+                                        teamRoomId={roomId}
                                         teamRole={roomData.teamRole}
                                         isSpectator={isSpectator}
                                         teamAName={roomData.teamAName ?? null}

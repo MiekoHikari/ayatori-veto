@@ -26,7 +26,8 @@ export interface VetoState {
 }
 
 export interface VetoProcessProps {
-    roomId: string;
+    masterRoomId: string; // For realtime subscriptions
+    teamRoomId: string;   // For API calls
     teamRole?: 'team-a' | 'team-b';
     isSpectator?: boolean;
     teamAName: string | null;
