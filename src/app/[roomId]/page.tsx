@@ -66,9 +66,6 @@ export default function RoomPage() {
         broadcastRoomUpdate
     } = supabaseRealtime;
 
-    // Debug latency value
-    console.log('🎯 Page component latency value:', latency);
-
     const updateTeamReadyMutation = api.room.updateTeamReady.useMutation({
         onSuccess: (updatedRoom) => {
             setRoomData(updatedRoom);

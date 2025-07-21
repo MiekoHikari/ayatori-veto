@@ -39,7 +39,19 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
     // Keep the callback ref up to date
     onUpdateRef.current = onUpdate;
 
-    const [clientId] = useState<string>(() => `client_${Math.random().toString(36).substring(2)}_${Date.now()}`);
+    const [clientId] = useState<string>(() => {
+        // Try to get clientId from sessionStorage
+        const storedClientId = typeof window !== "undefined" ? sessionStorage.getItem("supabaseClientId") : null;
+        if (storedClientId) {
+            return storedClientId;
+        }
+        // Generate new clientId and store it
+        const newClientId = `client_${Math.random().toString(36).substring(2)}_${Date.now()}`;
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem("supabaseClientId", newClientId);
+        }
+        return newClientId;
+    });
 
     useEffect(() => {
         if (!enabled || !roomId) {
