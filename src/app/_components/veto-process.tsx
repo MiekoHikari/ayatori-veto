@@ -8,6 +8,7 @@ import { AvailableMaps } from './veto/available-maps';
 import { VetoCompleted } from './veto/veto-completed';
 import { MapPoolOverview } from './veto/map-pool-overview';
 import { VetoProgress } from './veto/veto-progress';
+import { ConnectionRefreshPrompt } from '~/components/ui/connection-refresh-prompt';
 import type { VetoProcessProps } from '~/types/veto';
 
 export default function VetoProcess({
@@ -44,6 +45,11 @@ export default function VetoProcess({
 
         // Mutation states
         isActionPending,
+
+        // Realtime connection info
+        realtimeLatency,
+        realtimeRefreshPrompt,
+        realtimeFailureCount,
     } = useVetoLogic({
         masterRoomId,
         teamRoomId,
@@ -52,6 +58,17 @@ export default function VetoProcess({
         roundType,
         onVetoComplete
     });
+
+    const handleRefreshPage = () => {
+        // Force a hard page refresh to restore connection
+        window.location.reload();
+    };
+
+    const handleDismissRefreshPrompt = () => {
+        // This could be enhanced to temporarily dismiss but we'll keep it simple
+        // The prompt will reappear if connection issues persist
+        console.log('User dismissed veto connection refresh prompt');
+    };
 
     if (isLoading) {
         return (
@@ -143,6 +160,15 @@ export default function VetoProcess({
                 vetoState={vetoState}
                 teamAName={teamAName}
                 teamBName={teamBName}
+            />
+
+            {/* Connection Refresh Prompt - Only during active veto */}
+            <ConnectionRefreshPrompt
+                isVisible={realtimeRefreshPrompt && vetoStarted && !vetoCompleted}
+                onRefresh={handleRefreshPage}
+                onDismiss={handleDismissRefreshPrompt}
+                connectionFailureCount={realtimeFailureCount}
+                latency={realtimeLatency}
             />
         </div>
     );

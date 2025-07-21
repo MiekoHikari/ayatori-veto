@@ -30,6 +30,10 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
     const [error, setError] = useState<string | null>(null);
     const channelRef = useRef<RealtimeChannel | null>(null);
     const [latency, setLatency] = useState<number>(-1); // Initialize to -1 to distinguish from actual 0ms latency
+    const [shouldShowRefreshPrompt, setShouldShowRefreshPrompt] = useState(false);
+    const [connectionFailureCount, setConnectionFailureCount] = useState(0);
+    const lastPingTimestampRef = useRef<number | null>(null);
+    const missedPingsRef = useRef<number>(0);
     const onUpdateRef = useRef(onUpdate);
 
     // Keep the callback ref up to date
@@ -105,6 +109,25 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
                     console.log(`🏓 Setting latency state to: ${pingLatency}ms`);
                     setLatency(pingLatency);
                     console.log(`🏓 Ping latency: ${pingLatency}ms`);
+
+                    // Reset missed pings counter on successful ping response
+                    missedPingsRef.current = 0;
+                    lastPingTimestampRef.current = currentTime;
+
+                    // If latency is very high, increment connection failure count
+                    if (pingLatency > 5000) { // 5 seconds
+                        setConnectionFailureCount(prev => {
+                            const newCount = prev + 1;
+                            if (newCount >= 3) {
+                                setShouldShowRefreshPrompt(true);
+                            }
+                            return newCount;
+                        });
+                    } else if (pingLatency < 1000) {
+                        // Reset failure count on good connection
+                        setConnectionFailureCount(0);
+                        setShouldShowRefreshPrompt(false);
+                    }
                 }
             })
             .subscribe((status) => {
@@ -115,14 +138,30 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
                 if (statusStr === 'SUBSCRIBED') {
                     setIsConnected(true);
                     setError(null);
+                    setConnectionFailureCount(0);
+                    setShouldShowRefreshPrompt(false);
                     console.log(`✅ Successfully subscribed to room:${roomId}`);
                 } else if (statusStr === 'CHANNEL_ERROR') {
                     setIsConnected(false);
                     setError('Failed to connect to realtime updates');
+                    setConnectionFailureCount(prev => {
+                        const newCount = prev + 1;
+                        if (newCount >= 2) {
+                            setShouldShowRefreshPrompt(true);
+                        }
+                        return newCount;
+                    });
                     console.error(`❌ Channel error for room:${roomId}`);
                 } else if (statusStr === 'TIMED_OUT') {
                     setIsConnected(false);
                     setError('Connection timed out');
+                    setConnectionFailureCount(prev => {
+                        const newCount = prev + 1;
+                        if (newCount >= 2) {
+                            setShouldShowRefreshPrompt(true);
+                        }
+                        return newCount;
+                    });
                     console.error(`⏰ Timeout for room:${roomId}`);
                 } else if (statusStr === 'CLOSED') {
                     setIsConnected(false);
@@ -134,12 +173,28 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
         const latencyInterval = setInterval(() => {
             if (channelRef.current) {
                 const pingTimestamp = Date.now();
+
+                // Check for missed pings (no response for more than 5 seconds)
+                if (lastPingTimestampRef.current && pingTimestamp - lastPingTimestampRef.current > 5000) {
+                    missedPingsRef.current += 1;
+                    console.warn(`⚠️ Missed ping detected. Count: ${missedPingsRef.current}`);
+
+                    if (missedPingsRef.current >= 3) {
+                        console.error(`❌ Multiple missed pings detected for room:${roomId}`);
+                        setShouldShowRefreshPrompt(true);
+                        setError('Connection appears to be unstable');
+                    }
+                }
+
                 console.log(`🏓 Sending ping for room: ${roomId}`);
                 void channelRef.current.send({
                     type: 'broadcast',
                     event: 'ping',
                     payload: { clientId: clientId, timestamp: pingTimestamp },
                 });
+
+                // Set the timestamp for this ping attempt
+                lastPingTimestampRef.current ??= pingTimestamp;
             }
         }, 1000);
 
@@ -151,6 +206,10 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
                 channelRef.current = null;
             }
             setIsConnected(false);
+            setShouldShowRefreshPrompt(false);
+            setConnectionFailureCount(0);
+            missedPingsRef.current = 0;
+            lastPingTimestampRef.current = null;
         };
     }, [roomId, enabled, clientId]);
 
@@ -205,6 +264,8 @@ export const useSupabaseRoomUpdates = ({ roomId, enabled, onUpdate }: UseSupabas
         isConnected,
         error,
         latency,
+        shouldShowRefreshPrompt,
+        connectionFailureCount,
         broadcastRoomUpdate,
         broadcastVetoUpdate,
     };

@@ -15,6 +15,7 @@ import VetoProcess from '../_components/veto-process';
 import { type RoomData } from '~/types/room';
 import { MAP_DATA, getRoundLabel } from '~/constants/maps';
 import { useSupabaseRoomUpdates } from '~/hooks/use-supabase-realtime';
+import { ConnectionRefreshPrompt } from '~/components/ui/connection-refresh-prompt';
 
 export default function RoomPage() {
     const params = useParams();
@@ -57,7 +58,13 @@ export default function RoomPage() {
     });
 
     // Use the values directly from the hook instead of storing in separate state
-    const { isConnected: realtimeConnected, latency, broadcastRoomUpdate } = supabaseRealtime;
+    const {
+        isConnected: realtimeConnected,
+        latency,
+        shouldShowRefreshPrompt,
+        connectionFailureCount,
+        broadcastRoomUpdate
+    } = supabaseRealtime;
 
     // Debug latency value
     console.log('🎯 Page component latency value:', latency);
@@ -172,6 +179,17 @@ export default function RoomPage() {
         if (latency < 100) return 'default';
         if (latency < 300) return 'secondary';
         return 'destructive';
+    };
+
+    const handleRefreshPage = () => {
+        // Force a hard page refresh to restore connection
+        window.location.reload();
+    };
+
+    const handleDismissRefreshPrompt = () => {
+        // This could be enhanced to temporarily dismiss but we'll keep it simple
+        // The prompt will reappear if connection issues persist
+        console.log('User dismissed connection refresh prompt');
     };
 
     const isSpectator = !roomData?.teamRole;
@@ -505,6 +523,15 @@ export default function RoomPage() {
                     </div>
                 </div>
             </TooltipProvider>
+
+            {/* Connection Refresh Prompt */}
+            <ConnectionRefreshPrompt
+                isVisible={shouldShowRefreshPrompt}
+                onRefresh={handleRefreshPage}
+                onDismiss={handleDismissRefreshPrompt}
+                connectionFailureCount={connectionFailureCount}
+                latency={latency}
+            />
         </div>
     );
 }

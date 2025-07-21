@@ -40,7 +40,13 @@ export const useVetoLogic = ({
         }
     }, [vetoStateQuery]);
 
-    const { broadcastVetoUpdate, latency: realtimeLatency, isConnected: realtimeConnected } = useSupabaseRoomUpdates({
+    const {
+        broadcastVetoUpdate,
+        latency: realtimeLatency,
+        isConnected: realtimeConnected,
+        shouldShowRefreshPrompt: realtimeRefreshPrompt,
+        connectionFailureCount: realtimeFailureCount
+    } = useSupabaseRoomUpdates({
         roomId: masterRoomId, // Use masterRoomId for shared realtime channel
         enabled: !isSpectator,
         onUpdate: handleVetoUpdate,
@@ -285,5 +291,7 @@ export const useVetoLogic = ({
         // Realtime connection info
         realtimeLatency,
         realtimeConnected,
+        realtimeRefreshPrompt,
+        realtimeFailureCount,
     };
 };
