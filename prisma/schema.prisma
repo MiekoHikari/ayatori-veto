@@ -54,6 +54,8 @@ model User {
   accounts      Account[]
   posts         Post[]
   sessions      Session[]
+
+  organizer     Boolean? @default(false) // Indicates if the user is an organizer
 }
 
 model VerificationToken {

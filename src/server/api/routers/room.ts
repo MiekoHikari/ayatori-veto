@@ -1026,9 +1026,27 @@ export const roomRouter = createTRPCRouter({
                 return pick;
             });
 
+            // Create the side selection action
+            const sideAction: VetoAction = {
+                type: 'side',
+                mapId: input.mapId,
+                side: input.side,
+                team: teamRole,
+                timestamp: new Date().toISOString(),
+            };
+
+            // Get current step and mark it as completed, then advance
+            const currentStep = vetoState.currentStep ?? 0;
+            const updatedSequence = vetoState.vetoSequence.map((step, index) =>
+                index === currentStep ? { ...step, completed: true } : step
+            );
+
             const newVetoState: VetoState = {
                 ...vetoState,
+                actions: [...vetoState.actions, sideAction],
                 pickedMaps: updatedPickedMaps,
+                vetoSequence: updatedSequence,
+                currentStep: currentStep + 1,
             };
 
             // Check if veto is completed after side selection
@@ -1050,6 +1068,7 @@ export const roomRouter = createTRPCRouter({
             roomEventEmitter.emit(`room:${room.masterRoomId}:update`, {
                 type: 'side-selected',
                 room: room.masterRoomId,
+                action: sideAction,
                 mapId: input.mapId,
                 side: input.side,
                 vetoCompleted,
