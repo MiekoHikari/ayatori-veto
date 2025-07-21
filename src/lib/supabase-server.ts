@@ -5,7 +5,7 @@ import { env } from "~/env";
 export const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(
         env.NEXT_PUBLIC_SUPABASE_URL,
-        env.SUPABASE_SERVICE_ROLE_KEY as string,
+        env.SUPABASE_SERVICE_ROLE_KEY,
         {
             auth: {
                 autoRefreshToken: false,
