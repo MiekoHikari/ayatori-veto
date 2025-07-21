@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { EventEmitter } from "events";
-import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
 import {
     roomCreationLimiter,
@@ -675,81 +674,6 @@ export const roomRouter = createTRPCRouter({
                 status: updatedRoom.status as "waiting" | "active" | "completed" | "expired",
                 masterRoomId: updatedRoom.masterRoomId,
                 teamRole: isTeamA ? ("team-a" as const) : ("team-b" as const),
-            };
-        }),
-
-    // Real-time subscription for room updates
-    onRoomUpdate: publicProcedure
-        .input(z.object({
-            roomId: z.string(),
-        }))
-        .subscription(({ input }) => {
-            return observable<{
-                type: string;
-                room: string;
-                data?: unknown;
-            }>((emit) => {
-                const onUpdate = (data: { type: string; room: string;[key: string]: unknown }) => {
-                    if (data.room === input.roomId) {
-                        emit.next(data);
-                    }
-                };
-
-                roomEventEmitter.on(`room:${input.roomId}:update`, onUpdate);
-
-                return () => {
-                    roomEventEmitter.off(`room:${input.roomId}:update`, onUpdate);
-                };
-            });
-        }),
-
-    // Real-time room updates using polling (fallback for when subscriptions aren't available)
-    getRoomUpdates: publicProcedure
-        .input(z.object({
-            roomId: z.string(),
-            lastUpdate: z.number().optional(),
-        }))
-        .query(async ({ ctx, input }) => {
-            const room = await ctx.db.room.findFirst({
-                where: {
-                    OR: [
-                        { masterRoomId: input.roomId },
-                        { teamAId: input.roomId },
-                        { teamBId: input.roomId },
-                    ],
-                },
-            }) as RoomWithVeto | null;
-
-            if (!room) {
-                return null;
-            }
-
-            const teamRole = room.teamAId === input.roomId ? 'team-a' :
-                room.teamBId === input.roomId ? 'team-b' : undefined;
-
-            return {
-                id: room.masterRoomId,
-                teamAId: room.teamAId,
-                teamBId: room.teamBId,
-                teamALink: room.teamALink,
-                teamBLink: room.teamBLink,
-                spectatorLink: room.spectatorLink,
-                createdAt: room.createdAt.toISOString(),
-                expiresAt: room.expiresAt.toISOString(),
-                maps: room.maps,
-                roundType: room.roundType,
-                teamAReady: room.teamAReady,
-                teamBReady: room.teamBReady,
-                teamAName: room.teamAName,
-                teamBName: room.teamBName,
-                status: room.status as "waiting" | "active" | "completed" | "expired",
-                masterRoomId: room.masterRoomId,
-                teamRole,
-                vetoStarted: room.vetoStarted ?? false,
-                vetoCompleted: room.vetoCompleted ?? false,
-                currentTurn: room.currentTurn,
-                vetoState: room.vetoState as VetoState | null,
-                timestamp: Date.now(),
             };
         }),
 
